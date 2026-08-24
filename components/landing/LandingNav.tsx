@@ -110,7 +110,7 @@ export function LandingNav() {
           </Link>
           <Link href="/signup" className="hidden sm:block">
             <Button size="sm" className="rounded-full">
-              Try Free
+              Start creating tasks
             </Button>
           </Link>
           <button
@@ -169,7 +169,7 @@ export function LandingNav() {
               </Link>
               <Link href="/signup" onClick={closeMenu} className="mt-2 sm:hidden">
                 <Button size="sm" className="w-full rounded-full">
-                  Try Free
+                  Start creating tasks
                 </Button>
               </Link>
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AuthLayout } from "@/components/auth/AuthLayout";
@@ -14,8 +14,16 @@ function VerifyEmailContent() {
     searchParams.get("error") ? "This verification link is invalid or expired." : "Check your inbox for a verification link."
   );
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setInterval(() => setCooldown((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
 
   async function resend() {
+    if (cooldown > 0 || !email.trim()) return;
     setLoading(true);
     try {
       const response = await fetch("/api/auth/resend-verification", {
@@ -24,9 +32,15 @@ function VerifyEmailContent() {
         body: JSON.stringify({ email }),
       });
       const data = await response.json();
+      const retryAfter = Number(response.headers.get("Retry-After") ?? "30");
+      if (!response.ok) {
+        setCooldown(Number.isFinite(retryAfter) ? Math.max(1, retryAfter) : 30);
+        throw new Error(data.error ?? "Unable to request a new email right now.");
+      }
+      setCooldown(30);
       setMessage(data.message ?? "If an account needs verification, a new email has been sent.");
-    } catch {
-      setMessage("Unable to request a new email right now. Please try again later.");
+    } catch (requestError) {
+      setMessage(requestError instanceof Error ? requestError.message : "Unable to request a new email right now. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -50,8 +64,8 @@ function VerifyEmailContent() {
           className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
           labelClassName="text-slate-300"
         />
-        <Button type="button" onClick={resend} loading={loading} className="w-full" disabled={!email}>
-          Resend verification email
+        <Button type="button" onClick={resend} loading={loading} className="w-full" disabled={!email.trim() || loading || cooldown > 0}>
+          {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend verification email"}
         </Button>
         <p className="text-center text-sm text-slate-400">
           Already verified? <Link href="/login" className="text-violet-400 hover:text-violet-300">Sign in</Link>

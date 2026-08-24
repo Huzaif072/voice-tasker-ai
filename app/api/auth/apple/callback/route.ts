@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { handleAppleCallback } from "@/lib/auth/apple";
+import { getSafeReturnTo } from "@/lib/auth/redirect";
 
-function redirectToLogin(request: Request, error: string) {
-  return NextResponse.redirect(new URL(`/login?error=${error}`, request.url));
+function redirectToLogin(request: Request, error: string, returnTo = "/dashboard") {
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set("error", error);
+  if (returnTo !== "/dashboard") loginUrl.searchParams.set("returnTo", returnTo);
+  return NextResponse.redirect(loginUrl);
 }
 
 function getOAuthErrorCode(error: unknown) {
@@ -17,13 +21,15 @@ async function completeAppleCallback(
   values: { code: string | null; state: string | null; error: string | null; user: string | null }
 ) {
   const expectedState = request.headers.get("cookie")?.match(/(?:^|;\s*)apple_oauth_state=([^;]+)/)?.[1];
+  const returnToCookie = request.headers.get("cookie")?.match(/(?:^|;\s*)apple_oauth_return_to=([^;]+)/)?.[1];
+  const returnTo = getSafeReturnTo(returnToCookie ? decodeURIComponent(returnToCookie) : null);
 
   if (!values.state || !expectedState || values.state !== decodeURIComponent(expectedState)) {
-    return redirectToLogin(request, "oauth_state_invalid");
+    return redirectToLogin(request, "oauth_state_invalid", returnTo);
   }
 
   if (values.error || !values.code) {
-    return redirectToLogin(request, "oauth_cancelled");
+    return redirectToLogin(request, "oauth_cancelled", returnTo);
   }
 
   let userPayload: { name?: { firstName?: string; lastName?: string }; email?: string } | undefined;
@@ -37,7 +43,7 @@ async function completeAppleCallback(
 
   try {
     const { token } = await handleAppleCallback(values.code, userPayload);
-    const response = NextResponse.redirect(new URL("/dashboard", request.url));
+    const response = NextResponse.redirect(new URL(returnTo, request.url));
     response.cookies.set("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -46,10 +52,11 @@ async function completeAppleCallback(
       path: "/",
     });
     response.cookies.delete("apple_oauth_state");
+    response.cookies.delete("apple_oauth_return_to");
     return response;
   } catch (error) {
     console.error("Apple OAuth callback error:", error);
-    return redirectToLogin(request, getOAuthErrorCode(error));
+    return redirectToLogin(request, getOAuthErrorCode(error), returnTo);
   }
 }
 

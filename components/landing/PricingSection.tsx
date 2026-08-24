@@ -7,6 +7,10 @@ const includedFeatures = [
   "AI intent parsing and priorities",
   "Task lists, deadlines, and subtasks",
   "Daily and weekly summaries",
+  "Context-aware reminders",
+  "Voice delegation and collaboration",
+  "Realtime task synchronization",
+  "Behavior-driven prioritization",
 ];
 
 export function PricingSection() {
@@ -21,7 +25,7 @@ export function PricingSection() {
             Start organizing your day by voice.
           </h2>
           <p className="mt-4 text-lg text-slate-400">
-            The MVP is available for early users while we build the next generation of voice-first productivity.
+            Use the complete voice-first workspace to capture, understand, organize, and move work forward.
           </p>
         </div>
 
@@ -30,11 +34,11 @@ export function PricingSection() {
             <div>
               <p className="text-lg font-semibold text-slate-100">Early Access</p>
               <p className="mt-2 text-sm text-slate-400">
-                Everything currently available in the MVP.
+                Everything in the VoiceTasker AI workspace.
               </p>
             </div>
             <span className="rounded-full bg-violet-500/15 px-3 py-1 text-xs font-medium text-violet-300">
-              Available now
+              Early access
             </span>
           </div>
 
@@ -54,13 +58,13 @@ export function PricingSection() {
 
           <Link href="/signup" className="mt-8 block">
             <Button size="lg" className="w-full">
-              Join early access
+              Start creating tasks
             </Button>
           </Link>
 
           <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-slate-500">
             <Clock3 className="h-3.5 w-3.5" />
-            Paid plans and final limits will be announced before launch.
+            Pricing and final usage limits will be communicated before launch.
           </p>
         </div>
       </div>

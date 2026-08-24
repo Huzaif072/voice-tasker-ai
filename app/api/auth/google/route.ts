@@ -7,7 +7,15 @@ export async function GET(request: Request) {
   }
 
   const state = crypto.randomUUID();
+  const returnTo = new URL(request.url).searchParams.get("returnTo");
   const response = NextResponse.redirect(getGoogleAuthUrl(state));
+  response.cookies.set("google_oauth_return_to", returnTo?.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/dashboard", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 600,
+    path: "/",
+  });
   response.cookies.set("oauth_state", state, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

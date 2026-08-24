@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { handleGoogleCallback } from "@/lib/auth/google";
+import { getSafeReturnTo } from "@/lib/auth/redirect";
 
-function redirectToLogin(request: Request, error: string) {
-  return NextResponse.redirect(new URL(`/login?error=${error}`, request.url));
+function redirectToLogin(request: Request, error: string, returnTo = "/dashboard") {
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set("error", error);
+  if (returnTo !== "/dashboard") loginUrl.searchParams.set("returnTo", returnTo);
+  return NextResponse.redirect(loginUrl);
 }
 
 function getOAuthErrorCode(error: unknown) {
@@ -18,18 +22,20 @@ export async function GET(request: Request) {
   const error = searchParams.get("error");
   const state = searchParams.get("state");
   const expectedState = request.headers.get("cookie")?.match(/(?:^|;\s*)oauth_state=([^;]+)/)?.[1];
+  const returnToCookie = request.headers.get("cookie")?.match(/(?:^|;\s*)google_oauth_return_to=([^;]+)/)?.[1];
+  const returnTo = getSafeReturnTo(returnToCookie ? decodeURIComponent(returnToCookie) : null);
 
   if (!state || !expectedState || state !== decodeURIComponent(expectedState)) {
-    return redirectToLogin(request, "oauth_state_invalid");
+    return redirectToLogin(request, "oauth_state_invalid", returnTo);
   }
 
   if (error || !code) {
-    return redirectToLogin(request, "oauth_cancelled");
+    return redirectToLogin(request, "oauth_cancelled", returnTo);
   }
 
   try {
     const { token } = await handleGoogleCallback(code);
-    const response = NextResponse.redirect(new URL("/dashboard", request.url));
+    const response = NextResponse.redirect(new URL(returnTo, request.url));
     response.cookies.set("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -38,9 +44,10 @@ export async function GET(request: Request) {
       path: "/",
     });
     response.cookies.delete("oauth_state");
+    response.cookies.delete("google_oauth_return_to");
     return response;
   } catch (err) {
     console.error("Google OAuth callback error:", err);
-    return redirectToLogin(request, getOAuthErrorCode(err));
+    return redirectToLogin(request, getOAuthErrorCode(err), returnTo);
   }
 }

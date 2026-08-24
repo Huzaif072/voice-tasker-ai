@@ -20,17 +20,17 @@ export function CTASection() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(56,189,248,0.2),transparent_60%)]" />
         <div className="relative">
           <h2 className="text-3xl font-bold text-white lg:text-4xl">
-            Ready to plan your day by voice?
+            Turn your next thought into a task
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-violet-200">
-            Join the early-access community and help shape a more natural way to manage work.
+            Capture the thought before it gets lost, then turn it into organized work you can review and act on.
           </p>
           <Link href="/signup" className="mt-8 inline-block">
             <Button
               size="lg"
               className="bg-white text-violet-700 shadow-none hover:bg-violet-50"
             >
-              Join early access
+              Start creating tasks
               <ArrowRight className="h-5 w-5" />
             </Button>
           </Link>

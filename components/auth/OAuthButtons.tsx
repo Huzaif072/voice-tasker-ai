@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { getSafeReturnTo } from "@/lib/auth/redirect";
 
 const APPLE_SIGN_IN_ENABLED = process.env.NEXT_PUBLIC_APPLE_SIGN_IN_ENABLED === "true";
 
@@ -16,15 +17,16 @@ const oauthMessages: Record<string, string> = {
   oauth_state_invalid: "Your sign-in session expired. Please try again.",
 };
 
-export function OAuthButtons() {
+export function OAuthButtons({ returnTo }: { returnTo?: string } = {}) {
   const searchParams = useSearchParams();
   const [loadingProvider, setLoadingProvider] = useState<"google" | "apple" | null>(null);
   const errorCode = searchParams.get("error");
   const oauthError = errorCode ? oauthMessages[errorCode] ?? "Sign-in failed. Please try again." : "";
+  const safeReturnTo = getSafeReturnTo(returnTo ?? searchParams.get("returnTo"));
 
   function startOAuth(provider: "google" | "apple") {
     setLoadingProvider(provider);
-    window.location.assign(`/api/auth/${provider}`);
+    window.location.assign(`/api/auth/${provider}?returnTo=${encodeURIComponent(safeReturnTo)}`);
   }
 
   const busy = loadingProvider !== null;
@@ -32,7 +34,7 @@ export function OAuthButtons() {
   return (
     <div className="space-y-3">
       {oauthError ? (
-        <p className="text-sm text-red-400" role="alert">
+        <p className="text-sm text-red-400" role="alert" aria-live="polite">
           {oauthError}
         </p>
       ) : null}

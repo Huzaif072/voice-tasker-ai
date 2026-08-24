@@ -8,9 +8,9 @@ import { PricingSection } from "@/components/landing/PricingSection";
 import { FAQSection } from "@/components/landing/FAQSection";
 
 const steps = [
-  { num: "01", title: "Speak", desc: "Say what you need naturally—no special commands." },
-  { num: "02", title: "AI Understands", desc: "VoiceTasker parses intent, priority, deadlines, and context." },
-  { num: "03", title: "Take Action", desc: "Tasks are created, decomposed, delegated, and kept in sync." },
+  { num: "01", title: "Speak or type", desc: "Say what you need naturally, or enter the same kind of command when typing is easier." },
+  { num: "02", title: "Review the intent", desc: "VoiceTasker extracts the task, priority, deadline, context, and next steps for you to review." },
+  { num: "03", title: "Move work forward", desc: "Create, decompose, delegate, prioritize, and keep your plan moving from one workspace." },
 ];
 
 const useCases = [
@@ -28,7 +28,7 @@ export default function LandingPage() {
     name: "VoiceTasker AI",
     applicationCategory: "ProductivityApplication",
     operatingSystem: "Web",
-    description: "Voice-first task management for busy days.",
+    description: "Turn natural voice or typed commands into organized tasks, priorities, reminders, delegation, and daily briefings.",
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   };
 

@@ -7,7 +7,15 @@ export async function GET(request: Request) {
   }
 
   const state = crypto.randomUUID();
+  const returnTo = new URL(request.url).searchParams.get("returnTo");
   const response = NextResponse.redirect(getAppleAuthUrl(state));
+  response.cookies.set("apple_oauth_return_to", returnTo?.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/dashboard", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production" || process.env.APPLE_REDIRECT_URI?.startsWith("https://") === true,
+    sameSite: "none",
+    maxAge: 600,
+    path: "/",
+  });
   response.cookies.set("apple_oauth_state", state, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production" || process.env.APPLE_REDIRECT_URI?.startsWith("https://") === true,

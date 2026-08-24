@@ -1,12 +1,29 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, PlayCircle, Mic } from "lucide-react";
+import { ArrowRight, PlayCircle, Mic, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { VoiceWaveform } from "@/components/voice/VoiceWaveform";
 
+const demoExamples = [
+  {
+    transcript: "Prepare the client presentation for Friday and break it into clear steps...",
+    task: "Create task: Client presentation",
+    details: "Suggested priority · Due Friday · 4 subtasks",
+  },
+  {
+    transcript: "Remind me to review the launch plan tomorrow afternoon...",
+    task: "Create task: Review launch plan",
+    details: "Suggested priority · Due tomorrow afternoon · Reminder set",
+  },
+];
+
 export function HeroSection() {
+  const [demoIndex, setDemoIndex] = useState(0);
+  const demo = demoExamples[demoIndex];
+
   return (
     <section aria-labelledby="hero-heading" className="relative overflow-hidden px-6 pb-24 pt-32 lg:px-8">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -58,6 +75,9 @@ export function HeroSection() {
           <p className="mt-4 text-sm text-slate-500">
             Free during early access <span aria-hidden="true">·</span> Voice and typed commands <span aria-hidden="true">·</span> Review before you act
           </p>
+          <p className="mt-3 max-w-lg text-xs leading-5 text-slate-500">
+            Voice commands may be transcribed and saved with your account history. <Link href="/privacy" className="text-violet-400 hover:text-violet-300">Read the privacy details.</Link>
+          </p>
         </motion.div>
 
         <motion.div
@@ -78,17 +98,24 @@ export function HeroSection() {
             </div>
             <div className="rounded-xl bg-slate-900/80 p-4">
               <p className="text-sm text-slate-400">Example voice workflow</p>
-              <p className="mt-1 text-slate-200">
-                &quot;Prepare the client presentation for Friday and break it into clear steps...&quot;
-              </p>
+              <p className="mt-1 text-slate-200">&quot;{demo.transcript}&quot;</p>
             </div>
             <div className="mt-4 rounded-xl border border-violet-500/30 bg-violet-500/10 p-4">
               <p className="text-xs font-medium uppercase tracking-wider text-violet-400">
                 Parsed Intent
               </p>
-              <p className="mt-1 font-medium text-slate-200">Create task: Client presentation</p>
-              <p className="text-sm text-slate-400">Suggested priority · Due Friday · 4 subtasks</p>
+              <p className="mt-1 font-medium text-slate-200">{demo.task}</p>
+              <p className="text-sm text-slate-400">{demo.details}</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setDemoIndex((current) => (current + 1) % demoExamples.length)}
+              className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-violet-300 transition-colors hover:text-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-400/50"
+              aria-label="Show another voice workflow example"
+            >
+              <RotateCw aria-hidden="true" className="h-4 w-4" />
+              Try another example
+            </button>
           </div>
         </motion.div>
       </div>

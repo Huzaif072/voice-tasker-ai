@@ -11,9 +11,9 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
-  title: "VoiceTasker AI — Manage your day by voice",
+  title: "VoiceTasker AI — Turn spoken thoughts into action",
   description:
-    "Speak a task naturally and let VoiceTasker AI understand the intent, set the deadline, and keep your priorities moving.",
+    "Turn natural voice or typed commands into organized tasks, priorities, reminders, delegation, and daily briefings.",
   applicationName: "VoiceTasker AI",
   category: "productivity",
   keywords: ["voice task management", "AI task manager", "productivity", "voice assistant"],
@@ -21,9 +21,9 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
   manifest: "/manifest.json",
   openGraph: {
-    title: "VoiceTasker AI — Manage your day by voice",
+    title: "VoiceTasker AI — Turn spoken thoughts into action",
     description:
-      "Voice-first task management for busy days. Capture tasks, understand intent, and keep priorities moving.",
+      "Capture tasks, understand intent, set priorities, coordinate work, and keep your day moving with natural voice conversations.",
     type: "website",
     siteName: "VoiceTasker AI",
     images: [
@@ -31,14 +31,14 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "VoiceTasker AI — Manage your day by voice",
+        alt: "VoiceTasker AI — Turn spoken thoughts into action",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "VoiceTasker AI — Manage your day by voice",
-    description: "Voice-first task management for busy days.",
+    title: "VoiceTasker AI — Turn spoken thoughts into action",
+    description: "Voice-first productivity for tasks, priorities, reminders, and collaboration.",
     images: ["/og-image.png"],
   },
   icons: {

@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OAuthButtons, AuthDivider, AuthFooterLink } from "./OAuthButtons";
 import Link from "next/link";
+import { getSafeReturnTo } from "@/lib/auth/redirect";
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const returnTo = getSafeReturnTo(searchParams.get("returnTo"));
   const verificationStatus = searchParams.get("verified");
   const verificationMessage = verificationStatus === "1"
     ? "Your email has been verified successfully. You can now sign in."
@@ -40,7 +41,7 @@ export function LoginForm() {
         setVerificationRequired(Boolean(data.requiresEmailVerification));
         throw new Error(data.error ?? "Login failed");
       }
-      router.push("/dashboard");
+      router.push(returnTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -66,7 +67,7 @@ export function LoginForm() {
       ) : null}
 
       <div className="mt-8">
-        <OAuthButtons />
+        <OAuthButtons returnTo={returnTo} />
         <AuthDivider />
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -98,6 +99,7 @@ export function LoginForm() {
             required
           />
           {error ? <p className="text-sm text-red-400" role="alert" aria-live="polite">{error}</p> : null}
+          <p className="sr-only" aria-live="polite">{loading ? "Signing you in…" : ""}</p>
           {verificationRequired ? (
             <Link
               href={`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`}
