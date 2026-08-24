@@ -17,7 +17,7 @@ export default function VoicePage() {
   const dispatch = useDispatch();
   const { isRecording, isProcessing, transcript, interimTranscript, parsedIntent, error } =
     useSelector((s: RootState) => s.voice);
-  const { startRecording, stopRecording, submitText, supported } = useVoiceRecorder();
+  const { startRecording, stopRecording, submitText, confirmLastCommand, supported } = useVoiceRecorder();
   const [textInput, setTextInput] = useState("");
 
   function dismissPreview() {
@@ -55,40 +55,30 @@ export default function VoicePage() {
       />
 
       {parsedIntent ? (
-        <VoiceIntentPreview intent={parsedIntent} onDismiss={dismissPreview} />
+        <VoiceIntentPreview intent={parsedIntent} onDismiss={dismissPreview} onConfirm={confirmLastCommand} />
       ) : null}
 
-      {error ? <p className="text-center text-sm text-red-400">{error}</p> : null}
+      {error ? <p className="text-center text-sm text-red-400" role="alert" aria-live="assertive">{error}</p> : null}
+      <p className="sr-only" aria-live="polite">{isRecording ? "Listening" : isProcessing ? "Processing voice command" : ""}</p>
 
-      <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-4">
-        <p className="mb-3 text-sm text-slate-400">Or type your command:</p>
+      <form className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-4" onSubmit={(event) => { event.preventDefault(); if (textInput.trim()) { submitText(textInput.trim()); setTextInput(""); } }}>
+        <label htmlFor="voice-command-input" className="mb-3 block text-sm text-slate-400">Or type your command:</label>
         <div className="flex gap-2">
           <Input
+            id="voice-command-input"
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
             placeholder="Create a task to finish the quarterly report by Friday..."
             className="border-slate-600 bg-slate-700 text-slate-100"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && textInput.trim()) {
-                submitText(textInput);
-                setTextInput("");
-              }
-            }}
           />
-          <Button
-            onClick={() => {
-              if (textInput.trim()) {
-                submitText(textInput);
-                setTextInput("");
-              }
-            }}
+          <Button type="submit"
             loading={isProcessing}
             disabled={!textInput.trim()}
           >
             Send
           </Button>
         </div>
-      </div>
+      </form>
     </motion.div>
   );
 }

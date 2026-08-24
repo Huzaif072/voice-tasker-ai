@@ -5,6 +5,8 @@ export interface ParsedIntent {
   dueDate?: string;
   assignee?: string;
   rawQuery: string;
+  requiresConfirmation?: boolean;
+  ambiguousTasks?: { id: string; title: string }[];
 }
 
 export interface VoiceSession {
@@ -23,4 +25,5 @@ export interface VoiceInputRequest {
   text?: string;
   audio?: string;
   mimeType?: string;
+  confirm?: boolean;
 }

@@ -10,9 +10,10 @@ import type { ParsedIntent } from "@/types/voice";
 interface VoiceIntentPreviewProps {
   intent: ParsedIntent & { confidence: number };
   onDismiss?: () => void;
+  onConfirm?: () => void;
 }
 
-export function VoiceIntentPreview({ intent, onDismiss }: VoiceIntentPreviewProps) {
+export function VoiceIntentPreview({ intent, onDismiss, onConfirm }: VoiceIntentPreviewProps) {
   const needsConfirmation = intent.confidence < 0.7;
 
   return (
@@ -30,10 +31,10 @@ export function VoiceIntentPreview({ intent, onDismiss }: VoiceIntentPreviewProp
           </Badge>
         </div>
 
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-          <span className="text-sm text-emerald-300">
-            Action completed — review the details below.
+        <div className={`mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 ${intent.requiresConfirmation ? "border-amber-500/30 bg-amber-500/10" : "border-emerald-500/20 bg-emerald-500/10"}`}>
+          <CheckCircle2 className={`h-4 w-4 shrink-0 ${intent.requiresConfirmation ? "text-amber-400" : "text-emerald-400"}`} />
+          <span className={`text-sm ${intent.requiresConfirmation ? "text-amber-300" : "text-emerald-300"}`}>
+            {intent.requiresConfirmation ? "Confirmation required before this action." : "Action completed — review the details below."}
           </span>
         </div>
 
@@ -62,10 +63,14 @@ export function VoiceIntentPreview({ intent, onDismiss }: VoiceIntentPreviewProp
           ) : null}
         </div>
 
-        <div className="mt-4">
-          <Button size="sm" variant="ghost" onClick={onDismiss}>
-            Dismiss
-          </Button>
+        {intent.ambiguousTasks?.length ? (
+          <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
+            Matching tasks: {intent.ambiguousTasks.map((task) => task.title).join(", ")}. Please say the full task title.
+          </div>
+        ) : null}
+        <div className="mt-4 flex gap-2">
+          {intent.requiresConfirmation ? <Button size="sm" onClick={onConfirm}>Confirm action</Button> : null}
+          <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
         </div>
       </Card>
     </motion.div>

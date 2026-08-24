@@ -1,9 +1,13 @@
 import jwt from "jsonwebtoken";
 import { signupSchema } from "../lib/validators/auth.ts";
 import { rateLimit } from "../lib/redis/ratelimit.ts";
+import { voiceInputSchema } from "../lib/validators/voice.ts";
 import { getSafeReturnTo } from "../lib/auth/redirect.ts";
 
 async function main() {
+if (voiceInputSchema.safeParse({}).success) throw new Error("Expected empty voice input to be rejected");
+if (!voiceInputSchema.safeParse({ text: "delete the draft" }).success) throw new Error("Expected text voice input to be accepted");
+if (voiceInputSchema.safeParse({ audio: "a".repeat(12_000_001), mimeType: "audio/webm" }).success) throw new Error("Expected oversized audio input to be rejected");
 if (getSafeReturnTo("/dashboard/tasks?filter=urgent") !== "/dashboard/tasks?filter=urgent") {
   throw new Error("Expected an internal return path to be preserved");
 }

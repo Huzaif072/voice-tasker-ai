@@ -21,6 +21,8 @@ interface VoiceResponse {
   intent?: ParsedIntent & { confidence: number };
   message?: string;
   success?: boolean;
+  requiresConfirmation?: boolean;
+  ambiguousTasks?: { id: string; title: string }[];
 }
 
 export function useVoiceRecorder() {
@@ -29,12 +31,16 @@ export function useVoiceRecorder() {
   const { toast } = useToast();
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const requestRef = useRef<AbortController | null>(null);
+  const processingRef = useRef(false);
+  const lastCommandRef = useRef<string | null>(null);
   const [supported, setSupported] = useState(
     () => typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia)
   );
 
   const handleVoiceResponse = useCallback(
     (data: VoiceResponse) => {
+      if (data.transcript) lastCommandRef.current = data.transcript;
       dispatch(setTranscript(data.transcript ?? ""));
       if (data.intent) dispatch(setParsedIntent(data.intent));
 
@@ -49,6 +55,11 @@ export function useVoiceRecorder() {
 
   const processAudio = useCallback(
     async (blob: Blob) => {
+      if (processingRef.current) return;
+      processingRef.current = true;
+      requestRef.current?.abort();
+      const controller = new AbortController();
+      requestRef.current = controller;
       dispatch(setProcessing(true));
       try {
         const reader = new FileReader();
@@ -60,14 +71,17 @@ export function useVoiceRecorder() {
         const res = await fetch("/api/voice/input", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ audio: base64, mimeType: "audio/webm" }),
+          body: JSON.stringify({ audio: base64, mimeType: blob.type || "audio/webm" }),
+          signal: controller.signal,
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         handleVoiceResponse(data);
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         dispatch(setVoiceError(err instanceof Error ? err.message : "Processing failed"));
       } finally {
+        processingRef.current = false;
         dispatch(setProcessing(false));
       }
     },
@@ -79,7 +93,9 @@ export function useVoiceRecorder() {
       dispatch(resetVoice());
       dispatch(setVoiceError(null));
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      const preferredMimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+      const mimeType = preferredMimeTypes.find((candidate) => MediaRecorder.isTypeSupported(candidate));
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
@@ -88,7 +104,7 @@ export function useVoiceRecorder() {
 
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size < 1000) {
           dispatch(setVoiceError("Audio too short. Please speak longer."));
           return;
@@ -111,27 +127,40 @@ export function useVoiceRecorder() {
   }, [dispatch]);
 
   const submitText = useCallback(
-    async (text: string) => {
+    async (text: string, confirm = false) => {
+      if (processingRef.current) return;
+      processingRef.current = true;
+      requestRef.current?.abort();
+      const controller = new AbortController();
+      requestRef.current = controller;
       dispatch(setProcessing(true));
       try {
         const res = await fetch("/api/voice/input", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, confirm }),
+          signal: controller.signal,
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         handleVoiceResponse({ ...data, transcript: text });
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         dispatch(setVoiceError(err instanceof Error ? err.message : "Processing failed"));
       } finally {
+        processingRef.current = false;
         dispatch(setProcessing(false));
       }
     },
     [dispatch, handleVoiceResponse]
   );
 
-  return { startRecording, stopRecording, submitText, supported };
+  const confirmLastCommand = useCallback(() => {
+    if (!lastCommandRef.current || processingRef.current) return;
+    return submitText(lastCommandRef.current, true);
+  }, [submitText]);
+
+  return { startRecording, stopRecording, submitText, confirmLastCommand, supported };
 }
 
 export function useVoiceRecognition() {
