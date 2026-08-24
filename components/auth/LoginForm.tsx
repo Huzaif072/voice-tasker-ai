@@ -72,10 +72,14 @@ export function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Email"
+            name="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
+            autoComplete="username"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
             placeholder="you@example.com"
             className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
             labelClassName="text-slate-300"
@@ -83,6 +87,7 @@ export function LoginForm() {
           />
           <Input
             label="Password"
+            name="password"
             type="password"
             showToggle
             value={password}

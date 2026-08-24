@@ -35,13 +35,18 @@ function VerifyEmailContent() {
   return (
     <AuthLayout>
       <h1 className="text-3xl font-bold text-slate-100">Verify your email</h1>
-      <p className="mt-2 text-slate-400">{message}</p>
+      <p className="mt-2 text-slate-400" role="status" aria-live="polite">{message}</p>
       <div className="mt-8 space-y-4">
         <Input
           label="Email address"
+          name="email"
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
+          autoComplete="email"
+          inputMode="email"
+          autoCapitalize="none"
+          spellCheck={false}
           className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
           labelClassName="text-slate-300"
         />

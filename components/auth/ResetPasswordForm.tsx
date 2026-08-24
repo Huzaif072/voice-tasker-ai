@@ -69,28 +69,33 @@ export function ResetPasswordForm() {
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         <Input
           label="New password"
+          name="newPassword"
           type="password"
           showToggle
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+          aria-describedby="reset-password-requirements"
           className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
           labelClassName="text-slate-300"
           required
         />
-        <p className="-mt-2 text-xs leading-5 text-slate-400">
+        <p id="reset-password-requirements" className="-mt-2 text-xs leading-5 text-slate-400">
           Use at least 8 characters, including one uppercase letter and one number.
         </p>
         <Input
           label="Confirm password"
+          name="confirmPassword"
           type="password"
           showToggle
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
+          autoComplete="new-password"
           className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
           labelClassName="text-slate-300"
           required
         />
-        {error ? <p className="text-sm text-red-400" role="alert">{error}</p> : null}
+        {error ? <p className="text-sm text-red-400" role="alert" aria-live="polite">{error}</p> : null}
         <Button type="submit" loading={loading} className="w-full">
           Update password
         </Button>

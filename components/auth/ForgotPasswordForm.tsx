@@ -46,14 +46,19 @@ export function ForgotPasswordForm() {
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         <Input
           label="Email"
+          name="email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          inputMode="email"
+          autoCapitalize="none"
+          spellCheck={false}
           className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
           labelClassName="text-slate-300"
           required
         />
-        {error ? <p className="text-sm text-red-400" role="alert">{error}</p> : null}
+        {error ? <p className="text-sm text-red-400" role="alert" aria-live="polite">{error}</p> : null}
         {sent ? (
           <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300" role="status">
             <CheckCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />

@@ -79,7 +79,7 @@ export function LandingNav() {
   }
 
   return (
-    <nav className="glass-nav fixed inset-x-0 top-0 z-50">
+    <nav aria-label="Primary navigation" className="glass-nav fixed inset-x-0 top-0 z-50">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
         <Link href="/" className="flex items-center gap-2" onClick={closeMenu}>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600">
@@ -102,6 +102,12 @@ export function LandingNav() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className="hidden text-sm font-medium text-slate-300 transition-colors hover:text-white sm:block"
+          >
+            Log in
+          </Link>
           <Link href="/signup" className="hidden sm:block">
             <Button size="sm" className="rounded-full">
               Try Free
@@ -154,6 +160,13 @@ export function LandingNav() {
                   {link.label}
                 </motion.a>
               ))}
+              <Link
+                href="/login"
+                onClick={closeMenu}
+                className="mt-2 rounded-lg px-3 py-3 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white sm:hidden"
+              >
+                Log in
+              </Link>
               <Link href="/signup" onClick={closeMenu} className="mt-2 sm:hidden">
                 <Button size="sm" className="w-full rounded-full">
                   Try Free

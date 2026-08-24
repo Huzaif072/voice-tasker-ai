@@ -67,18 +67,23 @@ export function FAQSection() {
               <div key={faq.question} className="overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/50">
                 <button
                   type="button"
+                  id={`faq-question-${index}`}
                   aria-expanded={isOpen}
+                  aria-controls={`faq-answer-${index}`}
                   onClick={() => setOpenIndex(isOpen ? null : index)}
                   className="flex w-full items-center justify-between gap-6 px-5 py-5 text-left text-sm font-semibold text-slate-100 transition-colors hover:bg-slate-800"
                 >
                   <span>{faq.question}</span>
                   <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                    <ChevronDown className="h-5 w-5 shrink-0 text-violet-400" />
+                    <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-violet-400" />
                   </motion.span>
                 </button>
                 <AnimatePresence initial={false}>
                   {isOpen ? (
                     <motion.div
+                      id={`faq-answer-${index}`}
+                      role="region"
+                      aria-labelledby={`faq-question-${index}`}
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
