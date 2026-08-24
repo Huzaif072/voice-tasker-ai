@@ -29,17 +29,17 @@ export function HeroSection() {
         >
           <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-4 py-1.5 text-sm text-violet-300">
             <Mic className="h-4 w-4" />
-            Voice-first task management for busy days
+            Voice-first productivity for busy days
           </p>
           <h1 id="hero-heading" className="text-5xl font-bold leading-tight tracking-tight text-slate-50 lg:text-6xl xl:text-7xl">
-            Manage your day{" "}
+            Turn spoken thoughts into a plan{" "}
             <span className="bg-gradient-to-r from-violet-400 to-sky-400 bg-clip-text text-transparent">
-              by voice.
+              you can act on.
             </span>
           </h1>
           <p className="mt-6 max-w-lg text-lg text-slate-400">
-            Speak a task naturally and let VoiceTasker understand the intent, suggest the priority,
-            set the deadline, and keep your plan moving.
+            Say what you need in plain language. VoiceTasker turns it into an organized task with
+            the details you can review and refine.
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
             <Link href="/signup">
@@ -55,6 +55,9 @@ export function HeroSection() {
               </Button>
             </a>
           </div>
+          <p className="mt-4 text-sm text-slate-500">
+            Free during early access <span aria-hidden="true">·</span> Voice and typed commands <span aria-hidden="true">·</span> Review before you act
+          </p>
         </motion.div>
 
         <motion.div
@@ -63,7 +66,10 @@ export function HeroSection() {
           transition={{ duration: 0.4, delay: 0.2 }}
           className="relative"
         >
-          <div className="rounded-2xl border border-slate-700/50 bg-slate-800/80 p-6 shadow-2xl shadow-violet-600/10 backdrop-blur-sm">
+          <div
+            className="rounded-2xl border border-slate-700/50 bg-slate-800/80 p-6 shadow-2xl shadow-violet-600/10 backdrop-blur-sm"
+            aria-label="Example of a voice command being converted into a task"
+          >
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-600 shadow-lg shadow-violet-600/40">
                 <Mic className="h-6 w-6 text-white" />

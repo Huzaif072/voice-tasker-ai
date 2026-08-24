@@ -12,9 +12,11 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, labelClassName, error, type, showToggle, id, ...props }, ref) => {
+  ({ className, label, labelClassName, error, type, showToggle, id, "aria-describedby": ariaDescribedBy, ...props }, ref) => {
     const [showPassword, setShowPassword] = useState(false);
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
+    const errorId = error && inputId ? `${inputId}-error` : undefined;
+    const describedBy = [ariaDescribedBy, errorId].filter(Boolean).join(" ") || undefined;
     const isPassword = type === "password" && showToggle;
     const inputType = isPassword && showPassword ? "text" : type;
 
@@ -30,6 +32,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             type={inputType}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy}
             className={cn(
               "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-slate-900",
               "placeholder:text-slate-400 transition-colors",
@@ -51,7 +55,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             </button>
           ) : null}
         </div>
-        {error ? <p className="mt-1.5 text-sm text-red-500">{error}</p> : null}
+        {error ? <p id={errorId} className="mt-1.5 text-sm text-red-500" role="alert">{error}</p> : null}
       </div>
     );
   }

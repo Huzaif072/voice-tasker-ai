@@ -75,6 +75,7 @@ export function LoginForm() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
             placeholder="you@example.com"
             className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
             labelClassName="text-slate-300"
@@ -86,11 +87,12 @@ export function LoginForm() {
             showToggle
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
             className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
             labelClassName="text-slate-300"
             required
           />
-          {error ? <p className="text-sm text-red-400" role="alert">{error}</p> : null}
+          {error ? <p className="text-sm text-red-400" role="alert" aria-live="polite">{error}</p> : null}
           {verificationRequired ? (
             <Link
               href={`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`}

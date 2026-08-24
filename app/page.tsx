@@ -48,7 +48,7 @@ export default function LandingPage() {
 
         {/* Product promise */}
         <section className="border-y border-slate-800 py-8">
-          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-8 gap-y-3 px-6 text-center text-sm text-slate-400">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-8 gap-y-3 px-6 text-center text-sm text-slate-400" aria-label="VoiceTasker AI product principles">
             <span>Speak naturally</span>
             <span aria-hidden="true" className="hidden text-violet-500 sm:inline">•</span>
             <span>Turn intent into action</span>
@@ -64,7 +64,7 @@ export default function LandingPage() {
         {/* How it works */}
         <section id="how-it-works" aria-labelledby="how-it-works-heading" className="scroll-mt-24 px-6 py-20 lg:px-8 md:py-24">
           <div className="mx-auto max-w-7xl">
-            <h2 id="how-it-works-heading" className="text-center text-3xl font-bold text-slate-50">How It Works</h2>
+            <h2 id="how-it-works-heading" className="text-center text-3xl font-bold text-slate-50">From spoken thought to clear next step</h2>
             <div className="mt-16 grid gap-8 md:grid-cols-3">
               {steps.map((step, i) => (
                 <div key={step.num} className="relative text-center">

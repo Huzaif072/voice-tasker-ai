@@ -74,12 +74,12 @@ export function AuthLayout({ children }: AuthLayoutProps) {
                 <p className="mt-1 text-sm text-slate-400">
                   Speak naturally and let AI turn your words into organized tasks instantly.
                 </p>
-                <div className="mt-3 flex gap-4 text-sm font-medium text-violet-400">
-                  <span>Web</span>
+                <div className="mt-3 flex flex-wrap gap-4 text-sm font-medium text-violet-400">
+                  <span>Web app</span>
                   <span className="text-slate-600">·</span>
-                  <span>iOS</span>
+                  <span>Voice + typed commands</span>
                   <span className="text-slate-600">·</span>
-                  <span>Android</span>
+                  <span>Early access</span>
                 </div>
               </div>
             </div>

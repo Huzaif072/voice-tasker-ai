@@ -70,10 +70,11 @@ export function FeaturesGrid() {
       <div className="mx-auto max-w-7xl">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-slate-50 lg:text-4xl">
-            Everything you need, powered by voice
+            Everything you need to move work forward by voice
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-400">
-            From a quick thought to a clear plan, VoiceTasker turns natural speech into useful action.
+            Capture tasks, ask about priorities, break down complex work, coordinate with teammates,
+            receive contextual reminders, and review your day through natural voice conversations.
           </p>
         </div>
 

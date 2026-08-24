@@ -12,6 +12,7 @@ export function SignupForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -20,6 +21,10 @@ export function SignupForm() {
     setError("");
     if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
       setError("Password must be at least 8 characters and include an uppercase letter and a number.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
     setLoading(true);
@@ -58,6 +63,7 @@ export function SignupForm() {
             label="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            autoComplete="name"
             className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
             labelClassName="text-slate-300"
             required
@@ -67,6 +73,7 @@ export function SignupForm() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
             className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
             labelClassName="text-slate-300"
             required
@@ -77,6 +84,7 @@ export function SignupForm() {
             showToggle
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
             className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
             labelClassName="text-slate-300"
             required
@@ -84,7 +92,19 @@ export function SignupForm() {
           <p className="-mt-2 text-xs leading-5 text-slate-400">
             Use at least 8 characters, including one uppercase letter and one number.
           </p>
-          {error ? <p className="text-sm text-red-400" role="alert">{error}</p> : null}
+          <Input
+            label="Confirm password"
+            type="password"
+            showToggle
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+            error={confirmPassword && password !== confirmPassword ? "Passwords do not match." : undefined}
+            className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
+            labelClassName="text-slate-300"
+            required
+          />
+          {error ? <p className="text-sm text-red-400" role="alert" aria-live="polite">{error}</p> : null}
           <Button type="submit" loading={loading} className="w-full">
             Sign up with Email
           </Button>
