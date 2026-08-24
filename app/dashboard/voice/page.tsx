@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { motion } from "framer-motion";
 import { VoiceMicButton } from "@/components/voice/VoiceMicButton";
@@ -11,14 +11,23 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import type { RootState } from "@/store";
-import { setParsedIntent } from "@/store/slices/voiceSlice";
+import { setParsedIntent, setHistory } from "@/store/slices/voiceSlice";
+import { VoiceCommandHistory } from "@/components/voice/VoiceCommandHistory";
+import type { VoiceSession } from "@/types/voice";
 
 export default function VoicePage() {
   const dispatch = useDispatch();
-  const { isRecording, isProcessing, transcript, interimTranscript, parsedIntent, error } =
+  const { isRecording, isProcessing, transcript, interimTranscript, parsedIntent, queryResults, history, error } =
     useSelector((s: RootState) => s.voice);
-  const { startRecording, stopRecording, submitText, confirmLastCommand, supported } = useVoiceRecorder();
+  const { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, supported } = useVoiceRecorder();
   const [textInput, setTextInput] = useState("");
+
+  useEffect(() => {
+    fetch("/api/voice/history")
+      .then((response) => response.json())
+      .then((data: { sessions?: VoiceSession[] }) => dispatch(setHistory(data.sessions ?? [])))
+      .catch(() => undefined);
+  }, [dispatch, isProcessing, transcript]);
 
   function dismissPreview() {
     dispatch(setParsedIntent(null));
@@ -44,8 +53,9 @@ export default function VoicePage() {
           size="lg"
         />
         {!supported ? (
-          <p className="text-sm text-amber-400">Microphone unavailable. Use text input below.</p>
+          <p className="text-sm text-amber-400" role="status">Microphone unavailable. Use text input below.</p>
         ) : null}
+        {isProcessing ? <Button type="button" variant="ghost" onClick={cancelProcessing}>Cancel processing</Button> : null}
       </div>
 
       <VoiceTranscript
@@ -55,10 +65,16 @@ export default function VoicePage() {
       />
 
       {parsedIntent ? (
-        <VoiceIntentPreview intent={parsedIntent} onDismiss={dismissPreview} onConfirm={confirmLastCommand} />
+        <VoiceIntentPreview intent={parsedIntent} onDismiss={dismissPreview} onConfirm={confirmLastCommand} onSelectTask={(title) => setTextInput(`${parsedIntent.action} ${title}`)} />
       ) : null}
 
       {error ? <p className="text-center text-sm text-red-400" role="alert" aria-live="assertive">{error}</p> : null}
+      {queryResults.length ? (
+        <section aria-labelledby="voice-results-heading" className="space-y-3">
+          <h3 id="voice-results-heading" className="text-sm font-semibold text-slate-300">Matching tasks</h3>
+          {queryResults.map((task) => <div key={task._id} className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 py-2 text-sm"><span className="text-slate-200">{task.title}</span><span className="capitalize text-slate-400">{task.status} · {task.priority}</span></div>)}
+        </section>
+      ) : null}
       <p className="sr-only" aria-live="polite">{isRecording ? "Listening" : isProcessing ? "Processing voice command" : ""}</p>
 
       <form className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-4" onSubmit={(event) => { event.preventDefault(); if (textInput.trim()) { submitText(textInput.trim()); setTextInput(""); } }}>
@@ -79,6 +95,10 @@ export default function VoicePage() {
           </Button>
         </div>
       </form>
+      <section aria-labelledby="voice-history-heading" className="space-y-3">
+        <h3 id="voice-history-heading" className="text-sm font-semibold text-slate-300">Recent voice commands</h3>
+        <VoiceCommandHistory sessions={history} />
+      </section>
     </motion.div>
   );
 }

@@ -10,20 +10,22 @@ import { transcribeLocal } from "@/lib/whisper-cpp/transcribe";
 import { rateLimit, invalidateCache } from "@/lib/redis/ratelimit";
 import { findTasksByTitle } from "@/lib/tasks/find-by-title";
 import { sendDelegationEmail } from "@/lib/notifications/email";
+import { createVoiceConfirmation, verifyVoiceConfirmation } from "@/lib/voice/confirmation";
 import type { Task } from "@/types/task";
+import type { ParsedIntent } from "@/types/voice";
+
+type VoiceIntent = ParsedIntent & { confidence: number };
 
 const destructiveActions = new Set(["update", "delete", "delegate"]);
 
 function actionMessage(action: string, taskTitle?: string, success = true): string {
   if (!success) return taskTitle ? `Could not find a task matching "${taskTitle}".` : "Action could not be completed.";
-  switch (action) {
-    case "create": return taskTitle ? `Task "${taskTitle}" created successfully.` : "Task created successfully.";
-    case "update": return taskTitle ? `Task "${taskTitle}" marked as completed.` : "Task marked as completed.";
-    case "delete": return taskTitle ? `Task "${taskTitle}" deleted.` : "Task deleted.";
-    case "delegate": return taskTitle ? `Task "${taskTitle}" delegated successfully.` : "Task delegated successfully.";
-    case "query": return "Here are your matching tasks.";
-    default: return "Voice command processed.";
-  }
+  if (action === "create") return taskTitle ? `Task "${taskTitle}" created successfully.` : "Task created successfully.";
+  if (action === "update") return taskTitle ? `Task "${taskTitle}" marked as completed.` : "Task marked as completed.";
+  if (action === "delete") return taskTitle ? `Task "${taskTitle}" deleted.` : "Task deleted.";
+  if (action === "delegate") return taskTitle ? `Task "${taskTitle}" delegated successfully.` : "Task delegated successfully.";
+  if (action === "query") return "Here are your matching tasks.";
+  return "Voice command processed.";
 }
 
 function queryFilter(rawQuery: string, now = new Date()) {
@@ -42,6 +44,8 @@ function queryFilter(rawQuery: string, now = new Date()) {
   return filter;
 }
 
+function serializeTask(task: Task) { return { ...task, _id: task._id?.toString() }; }
+
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
@@ -52,47 +56,70 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = voiceInputSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid voice input" }, { status: 400 });
-
     let transcript = parsed.data.text ?? "";
     if (!transcript && parsed.data.audio) {
       const buffer = Buffer.from(parsed.data.audio, "base64");
-      const mimeType = parsed.data.mimeType ?? "audio/webm";
-      try { transcript = await transcribeAudio(buffer, mimeType); }
+      try { transcript = await transcribeAudio(buffer, parsed.data.mimeType ?? "audio/webm"); }
       catch { try { transcript = await transcribeLocal(buffer); } catch { return NextResponse.json({ error: "Transcription failed" }, { status: 502 }); } }
     }
     if (!transcript.trim()) return NextResponse.json({ error: "No speech detected" }, { status: 400 });
 
-    let intent;
+    let intent: VoiceIntent;
     try { intent = await parseIntent(transcript); } catch { intent = basicRegexIntent(transcript); }
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
+    const sessions = await getVoiceSessionsCollection(db);
+    const userId = auth.user.id;
     const now = new Date().toISOString();
     const candidates = intent.taskTitle ? await findTasksByTitle(tasks, auth.user.id, intent.taskTitle) : [];
+    const candidateSummary = candidates.map((candidate) => ({ id: candidate._id!.toString(), title: candidate.title }));
+
+    async function logSession(taskId?: string) {
+      await sessions.insertOne({ userId, inputText: transcript, parsedIntent: intent, taskId, model: "llama-3.3-70b-versatile", confidence: intent.confidence, timestamp: now });
+    }
 
     if (intent.action === "unknown") {
+      await logSession();
       return NextResponse.json({ transcript, intent, message: "I’m not sure what you want to do. Try creating, completing, deleting, delegating, or asking about a task.", success: false });
     }
     if (destructiveActions.has(intent.action) && !parsed.data.confirm) {
       if ((intent.action === "update" || intent.action === "delete") && !intent.taskTitle) {
+        await logSession();
         return NextResponse.json({ transcript, intent, message: `Which task should I ${intent.action === "delete" ? "delete" : "complete"}? Please include its title.`, success: false });
       }
       if (intent.action === "delegate" && (!intent.taskTitle || !intent.assignee)) {
+        await logSession();
         return NextResponse.json({ transcript, intent, message: "To delegate a task, please include both the task title and the assignee’s email address.", success: false });
       }
       if (candidates.length > 1) {
-        return NextResponse.json({ transcript, intent: { ...intent, ambiguousTasks: candidates.map((candidate) => ({ id: candidate._id!.toString(), title: candidate.title })) }, ambiguousTasks: candidates.map((candidate) => ({ id: candidate._id!.toString(), title: candidate.title })), message: `I found ${candidates.length} matching tasks. Please be more specific: ${candidates.map((candidate) => candidate.title).join(", ")}.`, success: false });
+        const nextIntent = { ...intent, ambiguousTasks: candidateSummary };
+        await sessions.insertOne({ userId: auth.user.id, inputText: transcript, parsedIntent: nextIntent, model: "llama-3.3-70b-versatile", confidence: intent.confidence, timestamp: now });
+        return NextResponse.json({ transcript, intent: nextIntent, ambiguousTasks: candidateSummary, message: `I found ${candidates.length} matching tasks. Please choose one or say the full task title.`, success: false });
       }
       if (!candidates.length) {
+        await logSession();
         return NextResponse.json({ transcript, intent, message: actionMessage(intent.action, intent.taskTitle, false), success: false });
       }
-      const actionVerb = intent.action === "delete" ? "delete" : intent.action === "delegate" ? "delegate" : "complete";
-      return NextResponse.json({ transcript, intent: { ...intent, requiresConfirmation: true }, requiresConfirmation: true, message: candidates[0] ? `Please confirm: ${actionVerb} “${candidates[0].title}”. Send the command again to confirm.` : `I couldn’t find a matching task to ${actionVerb}.`, success: false });
+      const token = createVoiceConfirmation(auth.user.id, intent.action, candidates[0]._id!.toString());
+      const nextIntent = { ...intent, requiresConfirmation: true };
+      await sessions.insertOne({ userId: auth.user.id, inputText: transcript, parsedIntent: nextIntent, taskId: candidates[0]._id!.toString(), model: "llama-3.3-70b-versatile", confidence: intent.confidence, timestamp: now });
+      const verb = intent.action === "delete" ? "delete" : intent.action === "delegate" ? "delegate" : "complete";
+      return NextResponse.json({ transcript, intent: nextIntent, requiresConfirmation: true, confirmationToken: token, message: `Please confirm: ${verb} “${candidates[0].title}”.`, success: false });
     }
 
     let taskId: string | undefined;
     let task: Task | undefined;
     let message = actionMessage(intent.action, intent.taskTitle);
     let success = true;
+
+    if (destructiveActions.has(intent.action)) {
+      const existing = candidates[0];
+      if (!existing || !parsed.data.confirm || !parsed.data.confirmationToken || !verifyVoiceConfirmation(parsed.data.confirmationToken, auth.user.id, intent.action, existing._id!.toString())) {
+        await logSession();
+        return NextResponse.json({ transcript, intent, message: "This confirmation is invalid or expired. Please repeat the command to request a new confirmation.", success: false }, { status: 409 });
+      }
+    }
+
     if (intent.action === "create" && intent.taskTitle) {
       const taskDoc = { title: intent.taskTitle, status: "pending" as const, priority: intent.priority ?? ("medium" as const), dueDate: intent.dueDate, subtasks: [], contextTriggers: [], delegatedTo: intent.assignee, createdBy: auth.user.id, tags: ["voice"], createdAt: now, updatedAt: now };
       const result = await tasks.insertOne(taskDoc); taskId = result.insertedId.toString(); task = { ...taskDoc, _id: taskId }; await invalidateCache(`tasks:${auth.user.id}:*`);
@@ -104,27 +131,24 @@ export async function POST(request: Request) {
         taskId = existing._id!.toString(); task = updated ? { ...updated, _id: taskId } : undefined; message = actionMessage("update", existing.title); await invalidateCache(`tasks:${auth.user.id}:*`);
       } else { await tasks.deleteOne({ _id: existing._id, createdBy: auth.user.id }); taskId = existing._id!.toString(); message = actionMessage("delete", existing.title); await invalidateCache(`tasks:${auth.user.id}:*`); }
     } else if (intent.action === "delegate" && intent.taskTitle && intent.assignee) {
-      const existing = candidates[0];
-      if (!existing) { success = false; message = actionMessage("delegate", intent.taskTitle, false); }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(intent.assignee)) { success = false; message = "Please provide a valid assignee email address."; }
       else {
-        await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { delegatedTo: intent.assignee, updatedAt: now } });
-        const sent = await sendDelegationEmail(intent.assignee, existing.title, auth.user.name);
-        taskId = existing._id!.toString(); message = sent ? actionMessage("delegate", existing.title) : `Task “${existing.title}” saved as pending delegation.`; await invalidateCache(`tasks:${auth.user.id}:*`);
+        const existing = candidates[0];
+        if (!existing) { success = false; message = actionMessage("delegate", intent.taskTitle, false); }
+        else { await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { delegatedTo: intent.assignee.toLowerCase(), updatedAt: now } }); const sent = await sendDelegationEmail(intent.assignee.toLowerCase(), existing.title, auth.user.name); taskId = existing._id!.toString(); message = sent ? actionMessage("delegate", existing.title) : `Task “${existing.title}” saved as pending delegation.`; await invalidateCache(`tasks:${auth.user.id}:*`); }
       }
-    } else if (intent.action === "delegate") {
-      success = false;
-      message = "To delegate a task, please include both the task title and the assignee’s email address.";
-    } else if (intent.action === "update" || intent.action === "delete") {
-      success = false;
-      message = `To ${intent.action === "delete" ? "delete" : "complete"} a task, please include its title.`;
     } else if (intent.action === "query") {
       const results = await tasks.find({ createdBy: auth.user.id, ...queryFilter(intent.rawQuery) }).sort({ dueDate: 1, priority: -1, createdAt: -1 }).limit(10).toArray();
-      message = results.length ? `I found ${results.length} matching task${results.length === 1 ? "" : "s"}.` : "I couldn’t find any tasks matching that query.";
+      const serialized = results.map((row) => serializeTask({ ...row, _id: row._id?.toString() } as Task));
+      message = serialized.length ? `I found ${serialized.length} matching task${serialized.length === 1 ? "" : "s"}.` : "I couldn’t find any tasks matching that query.";
+      await logSession();
+      return NextResponse.json({ transcript, intent, tasks: serialized, message, success: true });
+    } else if (intent.action === "delegate" || intent.action === "update" || intent.action === "delete") {
+      success = false; message = "I need more details to complete that command.";
     }
 
-    const sessions = await getVoiceSessionsCollection(db);
-    await sessions.insertOne({ userId: auth.user.id, inputText: transcript, parsedIntent: intent, taskId, model: "llama-3.3-70b-versatile", confidence: intent.confidence, timestamp: now });
-    return NextResponse.json({ transcript, intent, taskId, task: task ? { ...task, _id: task._id?.toString() } : undefined, message, success });
+    await logSession(taskId);
+    return NextResponse.json({ transcript, intent, taskId, task: task ? serializeTask(task) : undefined, message, success });
   } catch (err) {
     console.error("Voice input error:", err);
     return NextResponse.json({ error: "Voice processing failed" }, { status: 500 });

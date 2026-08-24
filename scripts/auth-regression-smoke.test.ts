@@ -2,9 +2,14 @@ import jwt from "jsonwebtoken";
 import { signupSchema } from "../lib/validators/auth.ts";
 import { rateLimit } from "../lib/redis/ratelimit.ts";
 import { voiceInputSchema } from "../lib/validators/voice.ts";
+import { voiceInputSchema } from "../lib/validators/voice.ts";
 import { getSafeReturnTo } from "../lib/auth/redirect.ts";
 
 async function main() {
+if (voiceInputSchema.safeParse({}).success) throw new Error("Expected empty voice input to be rejected");
+if (voiceInputSchema.safeParse({ text: "delete the draft" }).success !== true) throw new Error("Expected text voice input to be accepted");
+if (voiceInputSchema.safeParse({ audio: "a", mimeType: "audio/webm;codecs=opus" }).success !== true) throw new Error("Expected codec-qualified webm input to be accepted");
+if (voiceInputSchema.safeParse({ text: "a", audio: "b" }).success) throw new Error("Expected mixed text/audio input to be rejected");
 if (voiceInputSchema.safeParse({}).success) throw new Error("Expected empty voice input to be rejected");
 if (!voiceInputSchema.safeParse({ text: "delete the draft" }).success) throw new Error("Expected text voice input to be accepted");
 if (voiceInputSchema.safeParse({ audio: "a".repeat(12_000_001), mimeType: "audio/webm" }).success) throw new Error("Expected oversized audio input to be rejected");

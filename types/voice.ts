@@ -26,4 +26,5 @@ export interface VoiceInputRequest {
   audio?: string;
   mimeType?: string;
   confirm?: boolean;
+  confirmationToken?: string;
 }

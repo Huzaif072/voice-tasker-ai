@@ -11,9 +11,10 @@ interface VoiceIntentPreviewProps {
   intent: ParsedIntent & { confidence: number };
   onDismiss?: () => void;
   onConfirm?: () => void;
+  onSelectTask?: (title: string) => void;
 }
 
-export function VoiceIntentPreview({ intent, onDismiss, onConfirm }: VoiceIntentPreviewProps) {
+export function VoiceIntentPreview({ intent, onDismiss, onConfirm, onSelectTask }: VoiceIntentPreviewProps) {
   const needsConfirmation = intent.confidence < 0.7;
 
   return (
@@ -64,8 +65,9 @@ export function VoiceIntentPreview({ intent, onDismiss, onConfirm }: VoiceIntent
         </div>
 
         {intent.ambiguousTasks?.length ? (
-          <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
-            Matching tasks: {intent.ambiguousTasks.map((task) => task.title).join(", ")}. Please say the full task title.
+          <div className="mt-4 space-y-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
+            <p>Choose a matching task or say its full title:</p>
+            <div className="flex flex-wrap gap-2">{intent.ambiguousTasks.map((task) => <Button key={task.id} size="sm" variant="ghost" onClick={() => onSelectTask?.(task.title)}>{task.title}</Button>)}</div>
           </div>
         ) : null}
         <div className="mt-4 flex gap-2">

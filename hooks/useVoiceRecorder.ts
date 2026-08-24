@@ -11,6 +11,7 @@ import {
   setParsedIntent,
   setVoiceError,
   resetVoice,
+  setQueryResults,
 } from "@/store/slices/voiceSlice";
 import { useToast } from "@/components/ui/Toast";
 
@@ -23,6 +24,8 @@ interface VoiceResponse {
   success?: boolean;
   requiresConfirmation?: boolean;
   ambiguousTasks?: { id: string; title: string }[];
+  confirmationToken?: string;
+  tasks?: import("@/types/task").Task[];
 }
 
 export function useVoiceRecorder() {
@@ -34,6 +37,7 @@ export function useVoiceRecorder() {
   const requestRef = useRef<AbortController | null>(null);
   const processingRef = useRef(false);
   const lastCommandRef = useRef<string | null>(null);
+  const confirmationTokenRef = useRef<string | null>(null);
   const [supported, setSupported] = useState(
     () => typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia)
   );
@@ -41,6 +45,8 @@ export function useVoiceRecorder() {
   const handleVoiceResponse = useCallback(
     (data: VoiceResponse) => {
       if (data.transcript) lastCommandRef.current = data.transcript;
+      confirmationTokenRef.current = data.confirmationToken ?? null;
+      if (data.tasks) dispatch(setQueryResults(data.tasks));
       dispatch(setTranscript(data.transcript ?? ""));
       if (data.intent) dispatch(setParsedIntent(data.intent));
 
@@ -127,7 +133,7 @@ export function useVoiceRecorder() {
   }, [dispatch]);
 
   const submitText = useCallback(
-    async (text: string, confirm = false) => {
+    async (text: string, confirm = false, confirmationToken?: string) => {
       if (processingRef.current) return;
       processingRef.current = true;
       requestRef.current?.abort();
@@ -138,7 +144,7 @@ export function useVoiceRecorder() {
         const res = await fetch("/api/voice/input", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, confirm }),
+          body: JSON.stringify({ text, confirm, confirmationToken }),
           signal: controller.signal,
         });
         const data = await res.json();
@@ -157,10 +163,17 @@ export function useVoiceRecorder() {
 
   const confirmLastCommand = useCallback(() => {
     if (!lastCommandRef.current || processingRef.current) return;
-    return submitText(lastCommandRef.current, true);
+    return submitText(lastCommandRef.current, true, confirmationTokenRef.current ?? undefined);
   }, [submitText]);
 
-  return { startRecording, stopRecording, submitText, confirmLastCommand, supported };
+  const cancelProcessing = useCallback(() => {
+    requestRef.current?.abort();
+    processingRef.current = false;
+    dispatch(setProcessing(false));
+    dispatch(setVoiceError("Voice processing cancelled."));
+  }, [dispatch]);
+
+  return { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, supported };
 }
 
 export function useVoiceRecognition() {

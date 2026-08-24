@@ -1,5 +1,6 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { ParsedIntent } from "@/types/voice";
+import type { ParsedIntent, VoiceSession } from "@/types/voice";
+import type { Task } from "@/types/task";
 
 interface VoiceState {
   isRecording: boolean;
@@ -7,6 +8,8 @@ interface VoiceState {
   transcript: string;
   interimTranscript: string;
   parsedIntent: (ParsedIntent & { confidence: number }) | null;
+  queryResults: Task[];
+  history: VoiceSession[];
   error: string | null;
 }
 
@@ -16,6 +19,8 @@ const initialState: VoiceState = {
   transcript: "",
   interimTranscript: "",
   parsedIntent: null,
+  queryResults: [],
+  history: [],
   error: null,
 };
 
@@ -23,47 +28,18 @@ const voiceSlice = createSlice({
   name: "voice",
   initialState,
   reducers: {
-    setRecording(state, action: PayloadAction<boolean>) {
-      state.isRecording = action.payload;
-    },
-    setProcessing(state, action: PayloadAction<boolean>) {
-      state.isProcessing = action.payload;
-    },
-    setTranscript(state, action: PayloadAction<string>) {
-      state.transcript = action.payload;
-    },
-    setInterimTranscript(state, action: PayloadAction<string>) {
-      state.interimTranscript = action.payload;
-    },
-    appendTranscript(state, action: PayloadAction<string>) {
-      state.transcript += action.payload;
-    },
-    setParsedIntent(
-      state,
-      action: PayloadAction<(ParsedIntent & { confidence: number }) | null>
-    ) {
-      state.parsedIntent = action.payload;
-    },
-    setVoiceError(state, action: PayloadAction<string | null>) {
-      state.error = action.payload;
-    },
-    resetVoice(state) {
-      state.transcript = "";
-      state.interimTranscript = "";
-      state.parsedIntent = null;
-      state.error = null;
-    },
+    setRecording(state, action: PayloadAction<boolean>) { state.isRecording = action.payload; },
+    setProcessing(state, action: PayloadAction<boolean>) { state.isProcessing = action.payload; },
+    setTranscript(state, action: PayloadAction<string>) { state.transcript = action.payload; },
+    setInterimTranscript(state, action: PayloadAction<string>) { state.interimTranscript = action.payload; },
+    appendTranscript(state, action: PayloadAction<string>) { state.transcript += action.payload; },
+    setParsedIntent(state, action: PayloadAction<(ParsedIntent & { confidence: number }) | null>) { state.parsedIntent = action.payload; },
+    setQueryResults(state, action: PayloadAction<Task[]>) { state.queryResults = action.payload; },
+    setHistory(state, action: PayloadAction<VoiceSession[]>) { state.history = action.payload; },
+    setVoiceError(state, action: PayloadAction<string | null>) { state.error = action.payload; },
+    resetVoice(state) { state.transcript = ""; state.interimTranscript = ""; state.parsedIntent = null; state.queryResults = []; state.error = null; },
   },
 });
 
-export const {
-  setRecording,
-  setProcessing,
-  setTranscript,
-  setInterimTranscript,
-  appendTranscript,
-  setParsedIntent,
-  setVoiceError,
-  resetVoice,
-} = voiceSlice.actions;
+export const { setRecording, setProcessing, setTranscript, setInterimTranscript, appendTranscript, setParsedIntent, setQueryResults, setHistory, setVoiceError, resetVoice } = voiceSlice.actions;
 export default voiceSlice.reducer;
