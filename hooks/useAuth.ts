@@ -2,34 +2,51 @@
 
 import { useCallback, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { RootState } from "@/store";
 import { setUser, setLoading, logout as logoutAction } from "@/store/slices/authSlice";
 
+async function fetchCurrentUser() {
+  const response = await fetch("/api/auth/me");
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.user ?? null;
+}
+
 export function useAuth() {
   const dispatch = useDispatch();
-  const { user, loading } = useSelector((s: RootState) => s.auth);
+  const queryClient = useQueryClient();
+  const reduxUser = useSelector((s: RootState) => s.auth.user);
+  const { data: user = null, isLoading } = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: fetchCurrentUser,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => dispatch(setUser(data?.user ?? null)))
-      .catch(() => dispatch(setUser(null)));
-  }, [dispatch]);
+    dispatch(setLoading(isLoading));
+    if (!isLoading) dispatch(setUser(user));
+  }, [dispatch, isLoading, user]);
 
   const logout = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
+      queryClient.setQueryData(["auth", "me"], null);
       dispatch(logoutAction());
       window.location.href = "/login";
     }
-  }, [dispatch]);
+  }, [dispatch, queryClient]);
 
-  return { user, loading, logout, isAuthenticated: !!user };
+  return { user: user ?? reduxUser, loading: isLoading, logout, isAuthenticated: Boolean(user ?? reduxUser) };
 }
 
 export function useAuthActions() {
   const dispatch = useDispatch();
+  const queryClient = useQueryClient();
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -40,11 +57,15 @@ export function useAuthActions() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) {
+        dispatch(setLoading(false));
+        throw new Error(data.error);
+      }
       dispatch(setUser(data.user));
+      queryClient.setQueryData(["auth", "me"], data.user);
       return data;
     },
-    [dispatch]
+    [dispatch, queryClient]
   );
 
   return { login };

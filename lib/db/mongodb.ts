@@ -11,21 +11,27 @@ declare global {
 }
 
 function getClientPromise(): Promise<MongoClient> {
-  if (!uri) {
-    throw new Error("MONGODB_URI is not defined");
-  }
+  if (!uri) throw new Error("MONGODB_URI is not defined");
 
   if (process.env.NODE_ENV === "development") {
     if (!global._mongoClientPromise) {
       client = new MongoClient(uri, options);
-      global._mongoClientPromise = client.connect();
+      global._mongoClientPromise = client.connect().catch((error) => {
+        global._mongoClientPromise = undefined;
+        client = null;
+        throw error;
+      });
     }
     return global._mongoClientPromise;
   }
 
   if (!clientPromise) {
     client = new MongoClient(uri, options);
-    clientPromise = client.connect();
+    clientPromise = client.connect().catch((error) => {
+      clientPromise = null;
+      client = null;
+      throw error;
+    });
   }
   return clientPromise;
 }

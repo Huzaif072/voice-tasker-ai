@@ -68,6 +68,7 @@ export async function POST(request: Request) {
 
     const result = await tasks.insertOne(taskDoc);
     await invalidateCache(`tasks:${auth.user.id}:*`);
+    await invalidateCache(`ai-summary:${auth.user.id}:*`);
 
     return NextResponse.json(
       { task: { ...taskDoc, _id: result.insertedId.toString() } },

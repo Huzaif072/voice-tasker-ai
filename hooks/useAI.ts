@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 export function useAI() {
   const decompose = useMutation({
@@ -27,6 +27,22 @@ export function useAI() {
     },
   });
 
+  const useSummary = (period: "daily" | "weekly" = "daily") => useQuery({
+    queryKey: ["ai-summary", period],
+    queryFn: async () => {
+      const res = await fetch("/api/ai/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ period }),
+      });
+      if (!res.ok) throw new Error("Summary failed");
+      return res.json();
+    },
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+
   const followup = useMutation({
     mutationFn: async (taskId: string) => {
       const res = await fetch("/api/ai/followup", {
@@ -39,5 +55,5 @@ export function useAI() {
     },
   });
 
-  return { decompose, summarize, followup };
+  return { decompose, summarize, useSummary, followup };
 }

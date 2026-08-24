@@ -55,6 +55,7 @@ export function useVoiceRecorder() {
       }
 
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["voice-history"] });
     },
     [dispatch, queryClient, toast]
   );

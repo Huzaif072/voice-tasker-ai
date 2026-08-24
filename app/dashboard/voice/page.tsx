@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { motion } from "framer-motion";
 import { VoiceMicButton } from "@/components/voice/VoiceMicButton";
@@ -11,23 +11,18 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import type { RootState } from "@/store";
-import { setParsedIntent, setHistory } from "@/store/slices/voiceSlice";
+import { setParsedIntent } from "@/store/slices/voiceSlice";
 import { VoiceCommandHistory } from "@/components/voice/VoiceCommandHistory";
-import type { VoiceSession } from "@/types/voice";
+import { useVoiceHistory } from "@/hooks/useVoiceHistory";
 
 export default function VoicePage() {
   const dispatch = useDispatch();
-  const { isRecording, isProcessing, transcript, interimTranscript, parsedIntent, queryResults, history, error } =
+  const { isRecording, isProcessing, transcript, interimTranscript, parsedIntent, queryResults, error } =
     useSelector((s: RootState) => s.voice);
+  const { data: history = [] } = useVoiceHistory();
   const { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, supported } = useVoiceRecorder();
   const [textInput, setTextInput] = useState("");
 
-  useEffect(() => {
-    fetch("/api/voice/history")
-      .then((response) => response.json())
-      .then((data: { sessions?: VoiceSession[] }) => dispatch(setHistory(data.sessions ?? [])))
-      .catch(() => undefined);
-  }, [dispatch, isProcessing, transcript]);
 
   function dismissPreview() {
     dispatch(setParsedIntent(null));

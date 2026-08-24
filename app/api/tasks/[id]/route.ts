@@ -50,6 +50,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   if (!result) return NextResponse.json({ error: "Task not found" }, { status: 404 });
   await invalidateCache(`tasks:${auth.user.id}:*`);
+    await invalidateCache(`ai-summary:${auth.user.id}:*`);
 
   return NextResponse.json({ task: { ...result, _id: result._id?.toString() } });
 }
@@ -72,5 +73,6 @@ export async function DELETE(request: Request, { params }: Params) {
   }
 
   await invalidateCache(`tasks:${auth.user.id}:*`);
+    await invalidateCache(`ai-summary:${auth.user.id}:*`);
   return NextResponse.json({ success: true });
 }

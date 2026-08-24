@@ -11,7 +11,7 @@ async function fetchTasks(): Promise<Task[]> {
 }
 
 export function useTasks() {
-  return useQuery({ queryKey: ["tasks"], queryFn: fetchTasks });
+  return useQuery({ queryKey: ["tasks"], queryFn: fetchTasks, staleTime: 60_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false });
 }
 
 export function useCreateTask() {
