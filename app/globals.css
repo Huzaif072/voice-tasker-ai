@@ -1,26 +1,83 @@
 @import "tailwindcss";
 
+/* VoiceTasker AI Design Tokens — from Stitch MCP */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0F172A;
+  --foreground: #F8FAFC;
+  --primary: #7C3AED;
+  --primary-container: #7C3AED;
+  --secondary: #38BDF8;
+  --surface: #0F172A;
+  --surface-container: #1E293B;
+  --surface-container-high: #222a3d;
+  --on-surface: #F8FAFC;
+  --on-surface-variant: #94A3B8;
+  --outline: #334155;
+  --auth-white: #FFFFFF;
+  --auth-gradient-start: #F5F0FF;
+  --auth-gradient-end: #EDE9FE;
+  --page-bg: #F9FAFB;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --radius-input: 8px;
+  --radius-card: 12px;
+  --radius-full: 9999px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-surface: var(--surface);
+  --color-surface-container: var(--surface-container);
+  --color-violet-600: #7C3AED;
+  --color-slate-900: #0F172A;
+  --color-slate-800: #1E293B;
+  --color-sky-400: #38BDF8;
+  --font-sans: var(--font-inter);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.glow-violet {
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+}
+
+.glass-nav {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(15, 23, 42, 0.8);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+*:focus-visible {
+  outline: 2px solid #7C3AED;
+  outline-offset: 2px;
 }

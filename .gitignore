@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+*.p8
+*.key
 
 # debug
 npm-debug.log*
@@ -30,8 +32,16 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — keep .env.local.example as the committed template
 .env*
+!.env.local.example
+
+# local Whisper clone and models (large binaries)
+/whisper.cpp/
+*.bin
+
+# editor / MCP (may contain tokens)
+.cursor/mcp.json
 
 # vercel
 .vercel

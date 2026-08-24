@@ -1,0 +1,65 @@
+import jwt from "jsonwebtoken";
+import { signupSchema } from "../lib/validators/auth.ts";
+import { rateLimit } from "../lib/redis/ratelimit.ts";
+
+async function main() {
+const invalidName = signupSchema.safeParse({
+  name: "  a ",
+  email: "USER@EXAMPLE.COM",
+  password: "Password1",
+});
+if (invalidName.success) {
+  throw new Error("Expected trimmed minimum-length name validation to reject a one-character name");
+}
+
+const normalized = signupSchema.safeParse({
+  name: "  Ada Lovelace  ",
+  email: " USER@EXAMPLE.COM ",
+  password: "Password1",
+});
+if (!normalized.success || normalized.data.name !== "Ada Lovelace" || normalized.data.email !== "user@example.com") {
+  throw new Error("Expected signup input to trim the name and normalize the email");
+}
+
+process.env.NODE_ENV = "production";
+process.env.JWT_SECRET = "a".repeat(32);
+const { signToken, verifyToken } = await import("../lib/auth/jwt.ts");
+const token = signToken({ id: "507f1f77bcf86cd799439011", name: "Ada", email: "user@example.com" });
+if (!verifyToken(token)) {
+  throw new Error("Expected a correctly issued JWT to verify");
+}
+
+const wrongClaimsToken = jwt.sign(
+  { sub: "507f1f77bcf86cd799439011", name: "Ada", email: "user@example.com" },
+  process.env.JWT_SECRET,
+  { algorithm: "HS256", issuer: "wrong-issuer", audience: "wrong-audience" }
+);
+if (verifyToken(wrongClaimsToken)) {
+  throw new Error("Expected a JWT with incorrect issuer/audience to be rejected");
+}
+
+delete process.env.JWT_SECRET;
+let missingSecretRejected = false;
+try {
+  signToken({ id: "507f1f77bcf86cd799439011", name: "Ada", email: "user@example.com" });
+} catch {
+  missingSecretRejected = true;
+}
+if (!missingSecretRejected) {
+  throw new Error("Expected production JWT signing without a sufficiently long secret to fail");
+}
+
+delete process.env.UPSTASH_REDIS_REST_URL;
+delete process.env.UPSTASH_REDIS_REST_TOKEN;
+const fallback = await rateLimit("auth-smoke", 3, 60);
+if (!fallback.success || fallback.remaining !== 3) {
+  throw new Error("Expected Redis-disabled rate limiting to fail safely open");
+}
+
+console.log("PASS: auth normalization, JWT claim enforcement, production secret safety, and Redis fallback.");
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
