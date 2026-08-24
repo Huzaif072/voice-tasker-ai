@@ -6,7 +6,10 @@ function redirectToLogin(request: Request, error: string, returnTo = "/dashboard
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("error", error);
   if (returnTo !== "/dashboard") loginUrl.searchParams.set("returnTo", returnTo);
-  return NextResponse.redirect(loginUrl);
+  const response = NextResponse.redirect(loginUrl);
+  response.cookies.delete("oauth_state");
+  response.cookies.delete("google_oauth_return_to");
+  return response;
 }
 
 function getOAuthErrorCode(error: unknown) {

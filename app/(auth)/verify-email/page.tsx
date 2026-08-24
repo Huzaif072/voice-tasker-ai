@@ -6,9 +6,11 @@ import { useSearchParams } from "next/navigation";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { getSafeReturnTo } from "@/lib/auth/redirect";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
+  const returnTo = getSafeReturnTo(searchParams.get("returnTo"));
   const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [message, setMessage] = useState(
     searchParams.get("error") ? "This verification link is invalid or expired." : "Check your inbox for a verification link."
@@ -29,7 +31,7 @@ function VerifyEmailContent() {
       const response = await fetch("/api/auth/resend-verification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, returnTo }),
       });
       const data = await response.json();
       const retryAfter = Number(response.headers.get("Retry-After") ?? "30");
@@ -68,7 +70,7 @@ function VerifyEmailContent() {
           {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend verification email"}
         </Button>
         <p className="text-center text-sm text-slate-400">
-          Already verified? <Link href="/login" className="text-violet-400 hover:text-violet-300">Sign in</Link>
+          Already verified? <Link href={`/login?returnTo=${encodeURIComponent(returnTo)}`} className="text-violet-400 hover:text-violet-300">Sign in</Link>
         </p>
       </div>
     </AuthLayout>

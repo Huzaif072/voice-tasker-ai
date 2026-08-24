@@ -42,12 +42,12 @@ export function SignupForm() {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, returnTo }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Signup failed");
       if (data.requiresEmailVerification) {
-        router.push(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+        router.push(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}&returnTo=${encodeURIComponent(returnTo)}`);
       } else {
         router.push(returnTo);
       }

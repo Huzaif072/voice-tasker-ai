@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, Mic, X } from "lucide-react";
@@ -17,6 +17,7 @@ const navLinks = [
 export function LandingNav() {
   const [open, setOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const sections = navLinks
@@ -60,6 +61,20 @@ export function LandingNav() {
       if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
 
   function closeMenu() {
     setOpen(false);
@@ -116,7 +131,9 @@ export function LandingNav() {
           <button
             type="button"
             aria-label={open ? "Close navigation menu" : "Open navigation menu"}
+            ref={menuButtonRef}
             aria-expanded={open}
+            aria-controls="mobile-navigation"
             onClick={() => setOpen((current) => !current)}
             className="rounded-lg p-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-white md:hidden"
           >
@@ -139,6 +156,9 @@ export function LandingNav() {
       <AnimatePresence initial={false}>
         {open ? (
           <motion.div
+            id="mobile-navigation"
+            role="region"
+            aria-label="Mobile navigation"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}

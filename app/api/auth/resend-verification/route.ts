@@ -5,12 +5,15 @@ import { sendEmailVerificationEmail } from "@/lib/notifications/email";
 import { createOneTimeToken, getAppUrl } from "@/lib/auth/tokens";
 import { checkPasswordResetRateLimit, getRetryAfterSeconds } from "@/lib/auth/rate-limit";
 import { forgotPasswordSchema } from "@/lib/validators/auth";
+import { getSafeReturnTo } from "@/lib/auth/redirect";
 
 const GENERIC_MESSAGE = "If an account needs verification, a new verification email has been sent.";
 
 export async function POST(request: Request) {
   try {
-    const parsed = forgotPasswordSchema.safeParse(await request.json());
+    const body = await request.json();
+    const parsed = forgotPasswordSchema.safeParse(body);
+    const returnTo = getSafeReturnTo(typeof body.returnTo === "string" ? body.returnTo : null);
     if (!parsed.success) return NextResponse.json({ message: GENERIC_MESSAGE });
 
     const limit = await checkPasswordResetRateLimit(request, parsed.data.email);
@@ -40,7 +43,7 @@ export async function POST(request: Request) {
     const sent = await sendEmailVerificationEmail(
       user.email,
       user.name,
-      `${getAppUrl()}/api/auth/verify-email?token=${encodeURIComponent(verification.token)}`
+      `${getAppUrl()}/api/auth/verify-email?token=${encodeURIComponent(verification.token)}&returnTo=${encodeURIComponent(returnTo)}`
     );
     if (!sent) console.warn("Verification email could not be sent");
     return NextResponse.json({ message: GENERIC_MESSAGE });

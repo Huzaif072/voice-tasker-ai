@@ -12,7 +12,7 @@ export default function SummaryPage() {
 
   useEffect(() => {
     summarize.mutate(period);
-  }, [period]);
+  }, [period, summarize]);
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>

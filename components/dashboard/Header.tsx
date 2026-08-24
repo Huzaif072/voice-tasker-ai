@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Bell } from "lucide-react";
+import { Search } from "lucide-react";
 import { NotificationBell } from "./NotificationBell";
 
 interface HeaderProps {

@@ -7,11 +7,13 @@ import { sendEmailVerificationEmail } from "@/lib/notifications/email";
 import { createOneTimeToken, getAppUrl } from "@/lib/auth/tokens";
 import { isDuplicateKeyError } from "@/lib/db/errors";
 import { auditAuthEvent } from "@/lib/auth/audit";
+import { getSafeReturnTo } from "@/lib/auth/redirect";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const parsed = signupSchema.safeParse(body);
+    const returnTo = getSafeReturnTo(typeof body.returnTo === "string" ? body.returnTo : null);
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message ?? "Invalid input" },
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
     const verificationSent = await sendEmailVerificationEmail(
       email,
       name,
-      `${baseUrl}/api/auth/verify-email?token=${encodeURIComponent(verification.token)}`
+      `${baseUrl}/api/auth/verify-email?token=${encodeURIComponent(verification.token)}&returnTo=${encodeURIComponent(returnTo)}`
     );
     if (!verificationSent) {
       console.warn("Verification email could not be sent; account remains pending verification");

@@ -4,11 +4,17 @@ import { getUsersCollection } from "@/lib/db/models/User";
 import { getAppUrl, hashOneTimeToken } from "@/lib/auth/tokens";
 import { sendWelcomeEmail } from "@/lib/notifications/email";
 import { auditAuthEvent } from "@/lib/auth/audit";
+import { getSafeReturnTo } from "@/lib/auth/redirect";
 
 export async function GET(request: Request) {
-  const token = new URL(request.url).searchParams.get("token") ?? "";
+  const requestUrl = new URL(request.url);
+  const token = requestUrl.searchParams.get("token") ?? "";
+  const returnTo = getSafeReturnTo(requestUrl.searchParams.get("returnTo"));
   if (token.length < 32) {
-    return NextResponse.redirect(`${getAppUrl()}/verify-email?error=invalid`);
+    const verifyUrl = new URL(`${getAppUrl()}/verify-email`);
+    verifyUrl.searchParams.set("error", "invalid");
+    if (returnTo !== "/dashboard") verifyUrl.searchParams.set("returnTo", returnTo);
+    return NextResponse.redirect(verifyUrl);
   }
 
   try {
@@ -45,11 +51,15 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.redirect(
-      `${getAppUrl()}/login?verified=${result.modifiedCount === 1 ? "1" : "0"}`
-    );
+    const loginUrl = new URL(`${getAppUrl()}/login`);
+    loginUrl.searchParams.set("verified", result.modifiedCount === 1 ? "1" : "0");
+    if (returnTo !== "/dashboard") loginUrl.searchParams.set("returnTo", returnTo);
+    return NextResponse.redirect(loginUrl);
   } catch (error) {
     console.error("Email verification error:", error);
-    return NextResponse.redirect(`${getAppUrl()}/verify-email?error=unavailable`);
+    const verifyUrl = new URL(`${getAppUrl()}/verify-email`);
+    verifyUrl.searchParams.set("error", "unavailable");
+    if (returnTo !== "/dashboard") verifyUrl.searchParams.set("returnTo", returnTo);
+    return NextResponse.redirect(verifyUrl);
   }
 }

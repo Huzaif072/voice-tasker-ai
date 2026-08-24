@@ -1,8 +1,15 @@
 import jwt from "jsonwebtoken";
 import { signupSchema } from "../lib/validators/auth.ts";
 import { rateLimit } from "../lib/redis/ratelimit.ts";
+import { getSafeReturnTo } from "../lib/auth/redirect.ts";
 
 async function main() {
+if (getSafeReturnTo("/dashboard/tasks?filter=urgent") !== "/dashboard/tasks?filter=urgent") {
+  throw new Error("Expected an internal return path to be preserved");
+}
+if (getSafeReturnTo("https://example.com") !== "/dashboard" || getSafeReturnTo("//example.com") !== "/dashboard" || getSafeReturnTo("/\\example.com") !== "/dashboard") {
+  throw new Error("Expected unsafe return paths to fall back to the dashboard");
+}
 const invalidName = signupSchema.safeParse({
   name: "  a ",
   email: "USER@EXAMPLE.COM",

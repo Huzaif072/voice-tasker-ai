@@ -102,7 +102,7 @@ export function LoginForm() {
           <p className="sr-only" aria-live="polite">{loading ? "Signing you in…" : ""}</p>
           {verificationRequired ? (
             <Link
-              href={`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`}
+              href={`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}&returnTo=${encodeURIComponent(returnTo)}`}
               className="block text-sm text-violet-400 hover:text-violet-300"
             >
               Resend verification email
