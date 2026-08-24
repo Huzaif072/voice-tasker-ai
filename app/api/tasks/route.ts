@@ -6,6 +6,7 @@ import { taskSchema } from "@/lib/validators/task";
 import { getCached, setCache, invalidateCache } from "@/lib/redis/ratelimit";
 import { rateLimit } from "@/lib/redis/ratelimit";
 import type { Task } from "@/types/task";
+import { normalizeTask } from "@/lib/tasks/normalize";
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
@@ -15,8 +16,8 @@ export async function GET(request: Request) {
   const status = searchParams.get("status");
   const cacheKey = `tasks:${auth.user.id}:${status ?? "all"}`;
 
-  const cached = await getCached<Task[]>(cacheKey);
-  if (cached) return NextResponse.json({ tasks: cached });
+  const cached = await getCached<Partial<Task>[]>(cacheKey);
+  if (cached) return NextResponse.json({ tasks: cached.map(normalizeTask) });
 
   try {
     const db = await connectWithRetry();
@@ -25,10 +26,9 @@ export async function GET(request: Request) {
     if (status) filter.status = status;
 
     const results = await tasks.find(filter).sort({ createdAt: -1 }).limit(100).toArray();
-    const serialized = results.map((t) => ({
-      ...t,
-      _id: t._id?.toString(),
-    })) as Task[];
+    const serialized = results.map((t) =>
+      normalizeTask({ ...t, _id: t._id?.toString() } as Partial<Task>)
+    );
 
     await setCache(cacheKey, serialized);
     return NextResponse.json({ tasks: serialized });
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     await invalidateCache(`ai-summary:${auth.user.id}:*`);
 
     return NextResponse.json(
-      { task: { ...taskDoc, _id: result.insertedId.toString() } },
+      { task: normalizeTask({ ...taskDoc, _id: result.insertedId.toString() }) },
       { status: 201 }
     );
   } catch {

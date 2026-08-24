@@ -15,8 +15,10 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onToggle, onDelete }: TaskCardProps) {
-  const priority = priorityConfig[task.priority];
-  const completedSubtasks = task.subtasks.filter((s) => s.completed).length;
+  const priority = priorityConfig[task.priority] ?? priorityConfig.medium;
+  const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+  const tags = Array.isArray(task.tags) ? task.tags : [];
+  const completedSubtasks = subtasks.filter((s) => s.completed).length;
   const isCompleted = task.status === "completed";
 
   return (
@@ -54,12 +56,12 @@ export function TaskCard({ task, onToggle, onDelete }: TaskCardProps) {
         ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
           {task.dueDate ? <span>Due {formatRelativeDate(task.dueDate)}</span> : null}
-          {task.subtasks.length > 0 ? (
+          {subtasks.length > 0 ? (
             <span>
-              {completedSubtasks}/{task.subtasks.length} subtasks
+              {completedSubtasks}/{subtasks.length} subtasks
             </span>
           ) : null}
-          {task.tags.map((tag) => (
+          {tags.map((tag) => (
             <span key={tag} className="rounded bg-slate-700 px-1.5 py-0.5">
               {tag}
             </span>

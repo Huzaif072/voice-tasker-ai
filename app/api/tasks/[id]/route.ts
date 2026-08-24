@@ -5,6 +5,8 @@ import { connectWithRetry } from "@/lib/db/mongodb";
 import { getTasksCollection } from "@/lib/db/models/Task";
 import { taskUpdateSchema } from "@/lib/validators/task";
 import { invalidateCache } from "@/lib/redis/ratelimit";
+import type { Task } from "@/types/task";
+import { normalizeTask } from "@/lib/tasks/normalize";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,7 +24,9 @@ export async function GET(request: Request, { params }: Params) {
   const task = await tasks.findOne({ _id: new ObjectId(id), createdBy: auth.user.id });
 
   if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
-  return NextResponse.json({ task: { ...task, _id: task._id?.toString() } });
+  return NextResponse.json({
+    task: normalizeTask({ ...task, _id: task._id?.toString() } as Partial<Task>),
+  });
 }
 
 export async function PATCH(request: Request, { params }: Params) {
@@ -52,7 +56,9 @@ export async function PATCH(request: Request, { params }: Params) {
   await invalidateCache(`tasks:${auth.user.id}:*`);
     await invalidateCache(`ai-summary:${auth.user.id}:*`);
 
-  return NextResponse.json({ task: { ...result, _id: result._id?.toString() } });
+  return NextResponse.json({
+    task: normalizeTask({ ...result, _id: result._id?.toString() } as Partial<Task>),
+  });
 }
 
 export async function DELETE(request: Request, { params }: Params) {

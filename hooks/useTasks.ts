@@ -2,12 +2,13 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Task } from "@/types/task";
+import { normalizeTask } from "@/lib/tasks/normalize";
 
 async function fetchTasks(): Promise<Task[]> {
   const res = await fetch("/api/tasks");
   if (!res.ok) throw new Error("Failed to fetch tasks");
   const data = await res.json();
-  return data.tasks ?? [];
+  return Array.isArray(data.tasks) ? data.tasks.map((task: Partial<Task>) => normalizeTask(task)) : [];
 }
 
 export function useTasks() {
