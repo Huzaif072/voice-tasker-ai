@@ -1,6 +1,6 @@
 const QUEUE_DB = "voicetasker-offline";
 const QUEUE_STORE = "mutations";
-const STATIC_CACHE = "voicetasker-static-v1";
+const STATIC_CACHE = "voicetasker-static-v2";
 
 function openQueue() {
   return new Promise((resolve, reject) => {
@@ -71,10 +71,10 @@ async function flushQueuedMutations() {
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(STATIC_CACHE).then((cache) => cache.addAll(["/", "/icon.svg"])));
+  event.waitUntil(caches.open(STATIC_CACHE).then((cache) => cache.addAll(["/icon.svg"])));
   self.skipWaiting();
 });
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim().then(flushQueuedMutations)));
+self.addEventListener("activate", (event) => event.waitUntil(Promise.all([self.clients.claim(), caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith("voicetasker-static-") && key !== STATIC_CACHE).map((key) => caches.delete(key))))]).then(flushQueuedMutations)));
 self.addEventListener("message", (event) => {
   if (event.data?.type === "flush-offline-mutations") event.waitUntil(flushQueuedMutations());
   if (event.data?.type === "offline-mutation-state") event.waitUntil(postQueueState());
@@ -94,7 +94,7 @@ self.addEventListener("fetch", (event) => {
     }));
     return;
   }
-  const isStaticGet = request.method === "GET" && url.origin === self.location.origin && (url.pathname.startsWith("/_next/static/") || url.pathname === "/" || url.pathname === "/icon.svg");
+  const isStaticGet = request.method === "GET" && url.origin === self.location.origin && (url.pathname.startsWith("/_next/static/") || url.pathname === "/icon.svg");
   if (isStaticGet) event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => { const copy = response.clone(); void caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy)); return response; })));
 });
 

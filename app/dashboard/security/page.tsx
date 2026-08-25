@@ -23,8 +23,12 @@ export default function SecurityPage() {
   const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ enabled: true, channels: ["in_app"] });
   const [savingReminders, setSavingReminders] = useState(false);
-  const [locationTriggersEnabled, setLocationTriggersEnabled] = useState(() => typeof window !== "undefined" && localStorage.getItem(contextLocationStorageKey) === "true");
+  const [locationTriggersEnabled, setLocationTriggersEnabled] = useState(false);
   const [providerHealth, setProviderHealth] = useState<ProviderHealth | null>(null);
+
+  useEffect(() => {
+    if (window.localStorage.getItem(contextLocationStorageKey) === "true") queueMicrotask(() => setLocationTriggersEnabled(true));
+  }, []);
 
   useEffect(() => {
     fetch("/api/auth/providers")
