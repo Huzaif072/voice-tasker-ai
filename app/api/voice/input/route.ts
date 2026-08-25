@@ -12,6 +12,7 @@ import { findTasksByTitle } from "@/lib/tasks/find-by-title";
 import { sendDelegationEmail } from "@/lib/notifications/email";
 import { createVoiceConfirmation, verifyVoiceConfirmation } from "@/lib/voice/confirmation";
 import type { Task } from "@/types/task";
+import { normalizeTask } from "@/lib/tasks/normalize";
 import type { ParsedIntent } from "@/types/voice";
 
 type VoiceIntent = ParsedIntent & { confidence: number };
@@ -44,7 +45,9 @@ function queryFilter(rawQuery: string, now = new Date()) {
   return filter;
 }
 
-function serializeTask(task: Task) { return { ...task, _id: task._id?.toString() }; }
+function serializeTask(task: Partial<Task>) {
+  return normalizeTask({ ...task, _id: task._id?.toString() });
+}
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);

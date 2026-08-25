@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getTokenFromRequest, verifyToken } from "@/lib/auth/jwt";
 import { connectWithRetry } from "@/lib/db/mongodb";
 import { getUsersCollection } from "@/lib/db/models/User";
+import { isSessionVersionCurrent } from "@/lib/auth/session";
 
 export async function GET(request: Request) {
   const token = getTokenFromRequest(request);
@@ -16,12 +17,34 @@ export async function GET(request: Request) {
     const users = await getUsersCollection(db);
     const user = await users.findOne(
       { _id: new ObjectId(payload.sub) },
-      { projection: { email: 1, name: 1 } }
+      {
+        projection: {
+          email: 1,
+          name: 1,
+          disabledAt: 1,
+          sessionVersion: 1,
+          password: 1,
+          emailVerificationTokenHash: 1,
+          emailVerifiedAt: 1,
+        },
+      }
     );
-    if (!user) return NextResponse.json({ user: null });
+    if (!user || user.disabledAt) return NextResponse.json({ user: null });
+    if (!isSessionVersionCurrent(payload.sv, user.sessionVersion)) {
+      return NextResponse.json({ user: null });
+    }
+    if (user.password && user.emailVerificationTokenHash) {
+      return NextResponse.json({ user: null });
+    }
 
     return NextResponse.json({
-      user: { id: user._id!.toString(), email: user.email, name: user.name },
+      user: {
+        id: user._id!.toString(),
+        email: user.email,
+        name: user.name,
+        sessionVersion: user.sessionVersion ?? 0,
+        emailVerifiedAt: user.emailVerifiedAt,
+      },
     });
   } catch (error) {
     console.error("Session hydration error:", error);

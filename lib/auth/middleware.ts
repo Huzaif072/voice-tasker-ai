@@ -4,6 +4,7 @@ import { connectWithRetry } from "@/lib/db/mongodb";
 import { getUsersCollection } from "@/lib/db/models/User";
 import { getTokenFromRequest, verifyToken } from "./jwt";
 import type { AuthUser } from "@/types/user";
+import { isSessionVersionCurrent } from "./session";
 
 export async function requireAuth(
   request: Request
@@ -25,7 +26,7 @@ export async function requireAuth(
     if (!user || user.disabledAt) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (payload.sv !== undefined && payload.sv !== (user.sessionVersion ?? 0)) {
+    if (!isSessionVersionCurrent(payload.sv, user.sessionVersion)) {
       return NextResponse.json({ error: "Session expired" }, { status: 401 });
     }
     if (user.password && user.emailVerificationTokenHash) {

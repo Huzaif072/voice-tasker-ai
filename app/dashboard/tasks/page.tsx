@@ -57,6 +57,7 @@ export default function TasksPage() {
             tasks={filtered as Task[]}
             emptyMessage={search.trim() ? "No tasks match your search." : undefined}
             onToggle={(id) => {
+              if (updateTask.isPending) return;
               const task = tasks.find((t) => t._id === id);
               if (task)
                 updateTask.mutate({
@@ -64,10 +65,21 @@ export default function TasksPage() {
                   status: task.status === "completed" ? "pending" : "completed",
                 });
             }}
-            onDelete={(id) => deleteTask.mutate(id)}
+            onDelete={(id) => {
+              if (deleteTask.isPending) return;
+              const task = tasks.find((item) => item._id === id);
+              if (window.confirm(`Delete${task?.title ? ` “${task.title}”` : " this task"}?`)) {
+                deleteTask.mutate(id);
+              }
+            }}
           />
         )}
       </div>
+      {updateTask.isError || deleteTask.isError ? (
+        <p className="mt-3 text-sm text-red-400" role="alert">
+          {updateTask.isError ? "Unable to update that task." : "Unable to delete that task."}
+        </p>
+      ) : null}
     </motion.div>
   );
 }
