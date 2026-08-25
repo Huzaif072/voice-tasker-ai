@@ -4,7 +4,7 @@ VoiceTasker AI is a voice-first task manager built with Next.js, React, TypeScri
 
 ## Local development
 
-Use Node.js 20 or newer. Copy the environment template, fill the server-side values, install dependencies, and start the development server:
+Use Node.js 24 or newer. Copy the environment template, fill the server-side values, install dependencies, and start the development server:
 
 ```bash
 cp .env.local.example .env.local
