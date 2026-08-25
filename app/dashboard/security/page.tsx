@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { contextLocationStorageKey } from "@/hooks/useContextLocation";
 
 type Provider = { provider: string; linkedAt: string };
 type ReminderChannel = "in_app" | "email" | "push";
@@ -21,6 +22,7 @@ export default function SecurityPage() {
   const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ enabled: true, channels: ["in_app"] });
   const [savingReminders, setSavingReminders] = useState(false);
+  const [locationTriggersEnabled, setLocationTriggersEnabled] = useState(() => typeof window !== "undefined" && localStorage.getItem(contextLocationStorageKey) === "true");
 
   useEffect(() => {
     fetch("/api/auth/providers")
@@ -192,6 +194,14 @@ export default function SecurityPage() {
         <Button className="mt-4" onClick={pushStatus === "subscribed" ? unsubscribePush : subscribePush} loading={pushStatus === "loading"} disabled={pushStatus === "unsupported" || pushStatus === "unconfigured" || pushStatus === "denied"}>
           {pushStatus === "subscribed" ? "Disable browser push" : "Enable browser push"}
         </Button>
+      </section>
+      <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
+        <h2 className="text-lg font-semibold text-slate-100">Context-aware reminders</h2>
+        <p className="mt-2 text-sm text-slate-400">Location triggers use browser permission and send rounded coordinates only while you are signed in. Time, weather, and calendar checks run through the protected scheduler when configured.</p>
+        <label className="mt-4 flex items-center gap-3 text-sm text-slate-300">
+          <input type="checkbox" checked={locationTriggersEnabled} onChange={(event) => { const enabled = event.target.checked; setLocationTriggersEnabled(enabled); if (enabled) localStorage.setItem(contextLocationStorageKey, "true"); else localStorage.removeItem(contextLocationStorageKey); }} className="h-4 w-4 accent-violet-500" />
+          Enable location-trigger evaluation
+        </label>
       </section>
       <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
         <h2 className="text-lg font-semibold text-slate-100">Your data</h2>

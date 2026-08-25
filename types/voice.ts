@@ -3,6 +3,9 @@ export interface ParsedIntent {
   taskTitle?: string;
   priority?: "low" | "medium" | "high" | "urgent";
   dueDate?: string;
+  reminderAt?: string;
+  durationMinutes?: number;
+  calendarQuery?: string;
   assignee?: string;
   rawQuery: string;
   requiresConfirmation?: boolean;

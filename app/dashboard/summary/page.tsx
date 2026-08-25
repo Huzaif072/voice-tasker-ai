@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { SummaryCard } from "@/components/ai/SummaryCard";
 import { Button } from "@/components/ui/Button";
 import { useAI } from "@/hooks/useAI";
+import { speakText, stopSpeaking } from "@/lib/voice/speak";
 
 export default function SummaryPage() {
   const { useSummary } = useAI();
@@ -18,6 +19,7 @@ export default function SummaryPage() {
         <div className="flex gap-2">
           <Button size="sm" variant={period === "daily" ? "primary" : "ghost"} onClick={() => setPeriod("daily")}>Daily</Button>
           <Button size="sm" variant={period === "weekly" ? "primary" : "ghost"} onClick={() => setPeriod("weekly")}>Weekly</Button>
+          <Button size="sm" variant="ghost" onClick={() => summary.data?.summary ? speakText(summary.data.summary) : stopSpeaking()} disabled={!summary.data?.summary}>Read aloud</Button>
         </div>
       </div>
       <SummaryCard summary={summary.data?.summary ?? ""} period={period} loading={summary.isLoading} />

@@ -8,6 +8,8 @@ import { invalidateCache } from "@/lib/redis/ratelimit";
 import type { Task } from "@/types/task";
 import { normalizeTask } from "@/lib/tasks/normalize";
 import { cancelTaskDeliveries } from "@/lib/reminders/cancelTaskDeliveries";
+import { validateTaskDependencies } from "@/lib/tasks/dependencies";
+import { trackEvent } from "@/lib/analytics/events";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -54,11 +56,15 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid task update" }, { status: 400 });
   }
 
-  const updateFields = { ...parsed.data };
+  const updateFields = { ...parsed.data } as typeof parsed.data & { delegationStatus?: "none" | "pending" };
   const unsetFields: Record<string, ""> = {};
   if (updateFields.delegatedTo === "") {
     delete updateFields.delegatedTo;
     unsetFields.delegatedTo = "";
+  }
+  if (updateFields.delegatedPhone === "") {
+    delete updateFields.delegatedPhone;
+    unsetFields.delegatedPhone = "";
   }
   if (updateFields.dueDate === "") {
     delete updateFields.dueDate;
@@ -72,6 +78,12 @@ export async function PATCH(request: Request, { params }: Params) {
   try {
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
+    if (updateFields.dependencies) {
+      const dependencyError = await validateTaskDependencies(tasks, auth.user.id, id, updateFields.dependencies);
+      if (dependencyError) return NextResponse.json({ error: dependencyError }, { status: 400 });
+    }
+    if (typeof updateFields.delegatedTo === "string" || typeof updateFields.delegatedPhone === "string") updateFields.delegationStatus = "pending";
+    if (unsetFields.delegatedTo && unsetFields.delegatedPhone) updateFields.delegationStatus = "none";
     const result = await tasks.findOneAndUpdate(
       { _id: new ObjectId(id), createdBy: auth.user.id },
       {
@@ -82,6 +94,7 @@ export async function PATCH(request: Request, { params }: Params) {
     );
 
     if (!result) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    if (result.status === "completed") await trackEvent(db, auth.user.id, "task_completed");
     if (result.status === "completed" || result.status === "cancelled") {
       await cancelTaskDeliveries(db, id, auth.user.id);
     }
@@ -114,6 +127,7 @@ export async function DELETE(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
     await cancelTaskDeliveries(db, id, auth.user.id);
+    await trackEvent(db, auth.user.id, "task_deleted");
 
     await invalidateCache(`tasks:${auth.user.id}:*`);
     await invalidateCache(`ai-summary:${auth.user.id}:*`);

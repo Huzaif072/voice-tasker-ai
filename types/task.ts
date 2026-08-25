@@ -1,5 +1,6 @@
 export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
+export type DelegationStatus = "none" | "pending" | "sent" | "accepted" | "declined" | "failed";
 
 export interface Subtask {
   id: string;
@@ -8,8 +9,13 @@ export interface Subtask {
 }
 
 export interface ContextTrigger {
-  type: "location" | "time" | "keyword";
+  type: "location" | "time" | "calendar" | "weather" | "keyword";
   value: string;
+  latitude?: number;
+  longitude?: number;
+  radiusMeters?: number;
+  condition?: string;
+  lastTriggeredAt?: string;
 }
 
 export interface Task {
@@ -20,9 +26,14 @@ export interface Task {
   priority: TaskPriority;
   dueDate?: string;
   reminderAt?: string;
+  durationMinutes?: number;
+  calendarQuery?: string;
   subtasks: Subtask[];
+  dependencies: string[];
   contextTriggers: ContextTrigger[];
   delegatedTo?: string;
+  delegatedPhone?: string;
+  delegationStatus: DelegationStatus;
   createdBy: string;
   tags: string[];
   createdAt: string;

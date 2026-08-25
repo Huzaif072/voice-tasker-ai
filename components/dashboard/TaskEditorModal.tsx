@@ -6,7 +6,7 @@ import { TaskDecomposer } from "@/components/ai/TaskDecomposer";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import type { Subtask, Task, TaskPriority, TaskStatus } from "@/types/task";
+import type { ContextTrigger, Subtask, Task, TaskPriority, TaskStatus } from "@/types/task";
 
 export interface TaskEditorData {
   title: string;
@@ -16,7 +16,10 @@ export interface TaskEditorData {
   dueDate?: string;
   reminderAt?: string;
   tags: string[];
+  dependencies: string[];
+  contextTriggers: ContextTrigger[];
   delegatedTo?: string;
+  delegatedPhone?: string;
   subtasks: Subtask[];
 }
 
@@ -52,6 +55,13 @@ export function TaskEditorModal({ open, task, onClose, onSave, saving = false, e
   const [reminderAt, setReminderAt] = useState(toLocalDateTime(task?.reminderAt));
   const [tags, setTags] = useState(task?.tags.join(", ") ?? "");
   const [delegatedTo, setDelegatedTo] = useState(task?.delegatedTo ?? "");
+  const [delegatedPhone, setDelegatedPhone] = useState(task?.delegatedPhone ?? "");
+  const [dependencies, setDependencies] = useState((task?.dependencies ?? []).join(", "));
+  const initialTrigger = task?.contextTriggers?.[0];
+  const [triggerType, setTriggerType] = useState<ContextTrigger["type"]>(initialTrigger?.type ?? "time");
+  const [triggerValue, setTriggerValue] = useState(initialTrigger?.value ?? "");
+  const [triggerLatitude, setTriggerLatitude] = useState(initialTrigger?.latitude?.toString() ?? "");
+  const [triggerLongitude, setTriggerLongitude] = useState(initialTrigger?.longitude?.toString() ?? "");
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
 
@@ -79,7 +89,10 @@ export function TaskEditorModal({ open, task, onClose, onSave, saving = false, e
       dueDate: dueDate ? new Date(dueDate).toISOString() : "",
       reminderAt: reminderAt ? new Date(reminderAt).toISOString() : "",
       tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      dependencies: dependencies.split(",").map((id) => id.trim()).filter(Boolean),
+      contextTriggers: triggerValue.trim() ? [{ type: triggerType, value: triggerValue.trim(), ...(triggerType === "location" || triggerType === "weather" ? { latitude: Number(triggerLatitude), longitude: Number(triggerLongitude) } : {}) }] : [],
       delegatedTo: delegatedTo.trim() || undefined,
+      delegatedPhone: delegatedPhone.trim() || undefined,
       subtasks: subtasks.filter((subtask) => subtask.title.trim()),
     });
   }
@@ -125,7 +138,14 @@ export function TaskEditorModal({ open, task, onClose, onSave, saving = false, e
         <div className="grid gap-4 sm:grid-cols-2">
           <Input label="Tags" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="work, important" className="border-slate-600 bg-slate-700 text-slate-100" />
           <Input label="Delegated to (email)" type="email" value={delegatedTo} onChange={(event) => setDelegatedTo(event.target.value)} placeholder="teammate@example.com" className="border-slate-600 bg-slate-700 text-slate-100" />
+          <Input label="Delegated phone (E.164)" type="tel" value={delegatedPhone} onChange={(event) => setDelegatedPhone(event.target.value)} placeholder="+15551234567" className="border-slate-600 bg-slate-700 text-slate-100" />
         </div>
+        <Input label="Dependency IDs (comma separated)" value={dependencies} onChange={(event) => setDependencies(event.target.value)} placeholder="MongoDB task IDs" className="border-slate-600 bg-slate-700 text-slate-100" />
+        <fieldset className="rounded-xl border border-slate-700/70 p-3">
+          <legend className="px-1 text-sm font-medium text-slate-300">Context trigger</legend>
+          <div className="grid gap-3 sm:grid-cols-2"><select aria-label="Edit context trigger type" value={triggerType} onChange={(event) => setTriggerType(event.target.value as ContextTrigger["type"])} className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-slate-100"><option value="time">Time</option><option value="location">Location</option><option value="weather">Weather</option><option value="calendar">Calendar keyword</option></select><Input label="Value" value={triggerValue} onChange={(event) => setTriggerValue(event.target.value)} placeholder="office, rain, or ISO time" className="border-slate-600 bg-slate-700 text-slate-100" /></div>
+          {triggerType === "location" || triggerType === "weather" ? <div className="mt-3 grid gap-3 sm:grid-cols-2"><Input label="Latitude" type="number" value={triggerLatitude} onChange={(event) => setTriggerLatitude(event.target.value)} className="border-slate-600 bg-slate-700 text-slate-100" /><Input label="Longitude" type="number" value={triggerLongitude} onChange={(event) => setTriggerLongitude(event.target.value)} className="border-slate-600 bg-slate-700 text-slate-100" /></div> : null}
+        </fieldset>
 
         <fieldset className="rounded-xl border border-slate-700/70 p-3">
           <legend className="px-1 text-sm font-medium text-slate-300">Subtasks</legend>

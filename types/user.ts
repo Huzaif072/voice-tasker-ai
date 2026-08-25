@@ -37,6 +37,9 @@ export interface User {
   pushSubscription?: unknown;
   pushSubscriptionUpdatedAt?: string;
   reminderSettings?: ReminderSettings;
+  googleCalendarAccessToken?: string;
+  googleCalendarRefreshToken?: string;
+  googleCalendarExpiresAt?: string;
   createdAt: string;
 }
 

@@ -3,6 +3,8 @@ export type NotificationType =
   | "task_delegated"
   | "task_completed"
   | "voice_summary"
+  | "context_trigger"
+  | "delegation_status"
   | "system";
 
 export interface Notification {

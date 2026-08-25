@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/components/ui/Toast";
 
 import type { ParsedIntent } from "@/types/voice";
+import { speakText } from "@/lib/voice/speak";
 
 interface VoiceResponse {
   transcript?: string;
@@ -52,6 +53,7 @@ export function useVoiceRecorder() {
 
       if (data.message) {
         toast(data.message, data.success === false ? "error" : "success");
+        speakText(data.message);
       }
 
       queryClient.invalidateQueries({ queryKey: ["tasks"] });

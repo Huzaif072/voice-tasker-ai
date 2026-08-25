@@ -11,6 +11,7 @@ import type { RootState } from "@/store";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import Link from "next/link";
 import { DashboardSearchProvider } from "@/hooks/useDashboardSearch";
+import { useContextLocation } from "@/hooks/useContextLocation";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -19,6 +20,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useSocket(user?.id);
+  useContextLocation(Boolean(user));
 
   return (
     <div className="min-h-screen bg-slate-900">

@@ -5,6 +5,7 @@ import { getTasksCollection } from "@/lib/db/models/Task";
 import { generateSummary } from "@/lib/groq/summarizer";
 import { getCached, setCache } from "@/lib/redis/ratelimit";
 import { summaryInputSchema } from "@/lib/validators/ai";
+import { trackEvent } from "@/lib/analytics/events";
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
     );
 
     const summary = await generateSummary(userTasks, period);
+    await trackEvent(db, auth.user.id, "summary_requested", { period });
     await setCache(cacheKey, summary, 300);
     return NextResponse.json({ summary, period });
   } catch {

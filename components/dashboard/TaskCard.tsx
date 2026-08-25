@@ -62,6 +62,7 @@ export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
               {completedSubtasks}/{subtasks.length} subtasks
             </span>
           ) : null}
+          {task.dependencies?.length ? <span className="text-amber-400">Depends on {task.dependencies.length} task{task.dependencies.length === 1 ? "" : "s"}</span> : null}
           {tags.map((tag) => (
             <span key={tag} className="rounded bg-slate-700 px-1.5 py-0.5">
               {tag}

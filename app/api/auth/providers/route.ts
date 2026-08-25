@@ -37,11 +37,12 @@ export async function DELETE(request: Request) {
       provider: primary.provider,
       ...(primary.providerId ? { providerId: primary.providerId } : {}),
     };
+    const calendarUnset: Record<string, ""> = provider === "google" ? { googleCalendarAccessToken: "", googleCalendarRefreshToken: "", googleCalendarExpiresAt: "" } : {};
     await users.updateOne(
       { _id: user._id },
       primary.providerId
-        ? { $set: setFields, $inc: { sessionVersion: 1 } }
-        : { $set: setFields, $unset: { providerId: "" }, $inc: { sessionVersion: 1 } }
+        ? { $set: setFields, ...(Object.keys(calendarUnset).length ? { $unset: calendarUnset } : {}), $inc: { sessionVersion: 1 } }
+        : { $set: setFields, $unset: { providerId: "", ...calendarUnset }, $inc: { sessionVersion: 1 } }
     );
 
     auditAuthEvent("provider_unlinked", { userId: auth.user.id, provider });

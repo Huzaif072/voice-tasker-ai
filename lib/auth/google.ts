@@ -3,6 +3,7 @@ import { getUsersCollection, defaultVoiceSettings } from "@/lib/db/models/User";
 import { signToken } from "@/lib/auth/jwt";
 import { addLinkedProvider, getLinkedProviders } from "@/lib/auth/linked-providers";
 import { sendWelcomeEmail } from "@/lib/notifications/email";
+import { encryptSecret } from "@/lib/auth/secrets";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -16,13 +17,14 @@ interface GoogleProfile {
 }
 
 export function getGoogleAuthUrl(state: string): string {
+  const calendarEnabled = process.env.GOOGLE_CALENDAR_ENABLED === "true";
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID!,
     redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/google/callback`,
     response_type: "code",
-    scope: "openid email profile",
-    access_type: "online",
-    prompt: "select_account",
+    scope: calendarEnabled ? "openid email profile https://www.googleapis.com/auth/calendar.readonly" : "openid email profile",
+    access_type: calendarEnabled ? "offline" : "online",
+    prompt: calendarEnabled ? "consent" : "select_account",
     state,
   });
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
@@ -97,6 +99,17 @@ export async function handleGoogleCallback(code: string) {
   }
 
   if (!user) throw new Error("Failed to create or find user");
+
+  if (process.env.GOOGLE_CALENDAR_ENABLED === "true" && typeof tokens.access_token === "string") {
+    const calendarFields = {
+      googleCalendarAccessToken: encryptSecret(tokens.access_token),
+      ...(typeof tokens.refresh_token === "string" ? { googleCalendarRefreshToken: encryptSecret(tokens.refresh_token) } : {}),
+      ...(typeof tokens.expires_in === "number" ? { googleCalendarExpiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString() } : {}),
+    };
+    await users.updateOne({ _id: user._id }, { $set: calendarFields });
+    user = await users.findOne({ _id: user._id });
+    if (!user) throw new Error("Failed to refresh Google account state");
+  }
 
   const authUser = {
     id: user._id!.toString(),

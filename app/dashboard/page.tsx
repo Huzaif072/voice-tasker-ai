@@ -13,6 +13,7 @@ import { useTasks, useUpdateTask, useDeleteTask, useCreateTask } from "@/hooks/u
 import { useAuth } from "@/hooks/useAuth";
 import { useDashboardSearch } from "@/hooks/useDashboardSearch";
 import type { Task } from "@/types/task";
+import { PrioritySuggestions } from "@/components/dashboard/PrioritySuggestions";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -97,6 +98,7 @@ export default function DashboardPage() {
         dueThisWeek={stats.dueThisWeek}
         voiceCommands={stats.voiceCommands}
       />
+      <PrioritySuggestions />
 
       <div className="mt-8">
         <div className="mb-4 flex items-center justify-between">
@@ -189,6 +191,8 @@ export default function DashboardPage() {
               dueDate,
               reminderAt,
               tags: data.tags,
+              dependencies: data.dependencies,
+              contextTriggers: data.contextTriggers,
               delegatedTo: data.delegatedTo,
             },
             { onSuccess: () => setShowForm(false) }

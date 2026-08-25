@@ -15,6 +15,8 @@ import type { Task } from "@/types/task";
 import { normalizeTask } from "@/lib/tasks/normalize";
 import type { ParsedIntent } from "@/types/voice";
 import { withTimeout } from "@/lib/utils/withTimeout";
+import { trackEvent } from "@/lib/analytics/events";
+import { captureException } from "@/lib/monitoring/capture";
 
 type VoiceIntent = ParsedIntent & { confidence: number };
 
@@ -81,6 +83,7 @@ export async function POST(request: Request) {
 
     async function logSession(taskId?: string) {
       await sessions.insertOne({ userId, inputText: transcript, parsedIntent: intent, taskId, model: "llama-3.3-70b-versatile", confidence: intent.confidence, timestamp: now });
+      await trackEvent(db, userId, "voice_session", { action: intent.action, confidence: intent.confidence });
     }
 
     if (intent.action === "unknown") {
@@ -126,7 +129,7 @@ export async function POST(request: Request) {
     }
 
     if (intent.action === "create" && intent.taskTitle) {
-      const taskDoc = { title: intent.taskTitle, status: "pending" as const, priority: intent.priority ?? ("medium" as const), dueDate: intent.dueDate, subtasks: [], contextTriggers: [], delegatedTo: intent.assignee, createdBy: auth.user.id, tags: ["voice"], createdAt: now, updatedAt: now };
+      const taskDoc = { title: intent.taskTitle, status: "pending" as const, priority: intent.priority ?? ("medium" as const), dueDate: intent.dueDate, reminderAt: intent.reminderAt, durationMinutes: intent.durationMinutes, calendarQuery: intent.calendarQuery, subtasks: [], dependencies: [], contextTriggers: [], delegatedTo: intent.assignee, delegationStatus: intent.assignee ? ("pending" as const) : ("none" as const), createdBy: auth.user.id, tags: ["voice"], createdAt: now, updatedAt: now };
       const result = await tasks.insertOne(taskDoc); taskId = result.insertedId.toString(); task = { ...taskDoc, _id: taskId }; await invalidateCache(`tasks:${auth.user.id}:*`);
     } else if ((intent.action === "update" || intent.action === "delete") && intent.taskTitle) {
       const existing = candidates[0];
@@ -155,6 +158,7 @@ export async function POST(request: Request) {
     await logSession(taskId);
     return NextResponse.json({ transcript, intent, taskId, task: task ? serializeTask(task) : undefined, message, success });
   } catch (err) {
+    captureException(err, { route: "/api/voice/input" });
     console.error("Voice input error:", err);
     return NextResponse.json({ error: "Voice processing failed" }, { status: 500 });
   }

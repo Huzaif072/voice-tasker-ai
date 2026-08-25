@@ -8,6 +8,8 @@ import { rateLimit } from "@/lib/redis/ratelimit";
 import type { Task } from "@/types/task";
 import { normalizeTask } from "@/lib/tasks/normalize";
 import { buildTaskFilter, taskCacheKey, taskQuerySchema } from "@/lib/tasks/query";
+import { validateTaskDependencies } from "@/lib/tasks/dependencies";
+import { trackEvent } from "@/lib/analytics/events";
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
@@ -74,19 +76,24 @@ export async function POST(request: Request) {
 
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
+    const dependencyError = await validateTaskDependencies(tasks, auth.user.id, undefined, parsed.data.dependencies);
+    if (dependencyError) return NextResponse.json({ error: dependencyError }, { status: 400 });
     const now = new Date().toISOString();
 
     const taskDoc = {
       ...parsed.data,
       dueDate: parsed.data.dueDate || undefined,
       reminderAt: parsed.data.reminderAt || undefined,
-      contextTriggers: [] as Task["contextTriggers"],
+      dependencies: parsed.data.dependencies,
+      contextTriggers: parsed.data.contextTriggers as Task["contextTriggers"],
+      delegationStatus: parsed.data.delegatedTo || parsed.data.delegatedPhone ? ("pending" as const) : ("none" as const),
       createdBy: auth.user.id,
       createdAt: now,
       updatedAt: now,
     };
 
     const result = await tasks.insertOne(taskDoc);
+    await trackEvent(db, auth.user.id, "task_created", { source: "ui" });
     await invalidateCache(`tasks:${auth.user.id}:*`);
     await invalidateCache(`ai-summary:${auth.user.id}:*`);
 

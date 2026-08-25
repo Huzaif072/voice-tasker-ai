@@ -18,14 +18,16 @@
     "test:routes": "tsx scripts/routes-regression-smoke.test.ts",
     "test:reminders": "tsx scripts/reminder-worker-regression-smoke.test.ts",
     "test:delivery": "tsx scripts/delivery-regression-smoke.test.ts",
+    "test:all-gaps": "tsx scripts/all-gaps-regression-smoke.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:prod": "PLAYWRIGHT_PRODUCTION=true playwright test",
     "verify:indexes": "tsx scripts/verify-reminder-indexes.ts",
     "check:workflows": "tsx scripts/verify-workflow-actions.ts",
-    "test:all": "npm run check:workflows && npm run test:auth && npm run test:voice && npm run test:tasks && npm run test:notifications && npm run test:delegation && npm run test:api && npm run test:account && npm run test:health && npm run test:routes && npm run test:reminders && npm run test:delivery"
+    "test:all": "npm run check:workflows && npm run test:auth && npm run test:voice && npm run test:tasks && npm run test:notifications && npm run test:delegation && npm run test:api && npm run test:account && npm run test:health && npm run test:routes && npm run test:reminders && npm run test:delivery && npm run test:all-gaps"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",
+    "@sentry/nextjs": "^10.71.0",
     "@tanstack/react-query": "^5.101.2",
     "@upstash/redis": "^1.38.0",
     "bcryptjs": "^3.0.3",
