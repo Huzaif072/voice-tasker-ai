@@ -29,11 +29,13 @@ import { recordRealtimeEvent } from "@/lib/realtime/events";
 import { buildInvitationUrl, createTaskInvitation } from "@/lib/tasks/invitations";
 import { getTaskInvitationsCollection } from "@/lib/db/models/TaskInvitation";
 import { encryptUserJson, encryptUserText, decryptUserJson } from "@/lib/privacy/fieldEncryption";
+import { assembleVoiceUpload, MAX_AUDIO_BYTES } from "@/lib/voice/uploads";
+import { encryptTaskDocument, encryptedTaskUpdate, stripEncryptedTaskFields } from "@/lib/privacy/taskEncryption";
+import type { TaskDocument } from "@/lib/db/models/Task";
 
 type VoiceIntent = ParsedIntent & { confidence: number };
 const destructiveActions = new Set(["update", "delete", "delegate"]);
 const VOICE_PROVIDER_TIMEOUT_MS = 15_000;
-const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 
 function actionMessage(action: string, taskTitle?: string, success = true): string {
   if (!success) return taskTitle ? `Could not find a task matching "${taskTitle}".` : "Action could not be completed.";
@@ -120,9 +122,16 @@ export async function POST(request: Request) {
     const parsed = voiceInputSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid voice input" }, { status: 400 });
     let transcript = parsed.data.text ?? "";
-    if (!transcript && parsed.data.audio) {
+    let assembledMimeType = parsed.data.mimeType ?? "audio/webm";
+    if (!transcript && parsed.data.uploadId) {
+      const upload = await assembleVoiceUpload(await connectWithRetry(), auth.user.id, parsed.data.uploadId);
+      assembledMimeType = upload.mimeType;
+      try { transcript = await withTimeout(transcribeAudio(upload.audio, assembledMimeType), VOICE_PROVIDER_TIMEOUT_MS, "Remote transcription timed out"); }
+      catch { try { transcript = await withTimeout(transcribeLocal(upload.audio), VOICE_PROVIDER_TIMEOUT_MS, "Local transcription timed out"); } catch { return NextResponse.json({ error: "Transcription failed" }, { status: 502 }); } }
+    } else if (!transcript && parsed.data.audio) {
       const buffer = Buffer.from(parsed.data.audio, "base64");
-      try { transcript = await withTimeout(transcribeAudio(buffer, parsed.data.mimeType ?? "audio/webm"), VOICE_PROVIDER_TIMEOUT_MS, "Remote transcription timed out"); }
+      if (buffer.length > MAX_AUDIO_BYTES) return NextResponse.json({ error: "Audio recording is too large" }, { status: 413 });
+      try { transcript = await withTimeout(transcribeAudio(buffer, assembledMimeType), VOICE_PROVIDER_TIMEOUT_MS, "Remote transcription timed out"); }
       catch { try { transcript = await withTimeout(transcribeLocal(buffer), VOICE_PROVIDER_TIMEOUT_MS, "Local transcription timed out"); } catch { return NextResponse.json({ error: "Transcription failed" }, { status: 502 }); } }
     }
     if (!transcript.trim()) return NextResponse.json({ error: "No speech detected" }, { status: 400 });
@@ -208,7 +217,7 @@ export async function POST(request: Request) {
       const calendarLink = intent.calendarLink ?? buildCalendarComposeLink(intent.taskTitle, intent.dueDate ?? intent.reminderAt, intent.durationMinutes);
       const recipient = await findAssignableUser(db, intent.assignee);
       const taskDoc = { title: intent.taskTitle, description: intent.description, status: "pending" as const, priority: intent.priority ?? "medium", dueDate: intent.dueDate, reminderAt: intent.reminderAt, durationMinutes: intent.durationMinutes, calendarQuery: intent.calendarQuery, calendarLink, subtasks: intent.subtasks ?? [], dependencies: intent.dependencies ?? [], contextTriggers: intent.contextTriggers ?? [], delegatedTo: intent.assignee, delegatedPhone: intent.assigneePhone, assigneeUserId: recipient?._id?.toString(), assignmentStatus: recipient ? ("pending" as const) : ("none" as const), delegationStatus: intent.assignee || intent.assigneePhone ? ("pending" as const) : ("none" as const), createdBy: auth.user.id, tags: ["voice"], createdAt: now, updatedAt: now };
-      const result = await tasks.insertOne(taskDoc);
+      const result = await tasks.insertOne(encryptTaskDocument(taskDoc) as TaskDocument);
       await recordRealtimeEvent(db, auth.user.id, "task_created", result.insertedId.toString());
       if (recipient?._id) {
         await createAssignmentNotification(db, recipient._id.toString(), result.insertedId.toString(), intent.taskTitle, auth.user.name);
@@ -239,7 +248,8 @@ export async function POST(request: Request) {
         }
         if (intent.dueDate || intent.reminderAt) fieldUpdates.calendarLink = buildCalendarComposeLink(existing.title, intent.dueDate ?? intent.reminderAt, intent.durationMinutes ?? existing.durationMinutes);
         if (!Object.keys(fieldUpdates).length) fieldUpdates.status = "completed";
-        const updated = await tasks.findOneAndUpdate({ _id: existing._id, createdBy: auth.user.id }, { $set: { ...fieldUpdates, updatedAt: now } }, { returnDocument: "after" });
+        const encryptedUpdate = encryptedTaskUpdate(existing, fieldUpdates);
+        const updated = await tasks.findOneAndUpdate({ _id: existing._id, createdBy: auth.user.id }, { $set: { ...stripEncryptedTaskFields(fieldUpdates), ...encryptedUpdate.$set, updatedAt: now }, $unset: encryptedUpdate.$unset }, { returnDocument: "after" });
         taskId = existing._id!.toString(); task = updated ? { ...updated, _id: taskId } as Task : undefined; conversationContext = { ...conversationContext, lastTaskId: taskId, lastTaskTitle: existing.title }; message = actionMessage("update", existing.title); await recordRealtimeEvent(db, auth.user.id, "task_updated", taskId); await invalidateCache(`tasks:${auth.user.id}:*`); await invalidateCache(`ai-summary:${auth.user.id}:*`);
         if (fieldUpdates.status === "completed") {
           await trackEvent(db, userId, "task_completed");

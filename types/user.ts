@@ -49,8 +49,10 @@ export interface User {
   termsVersion?: string;
   privacyConsentAt?: string;
   termsAcceptedAt?: string;
+  privacyConsentRevokedAt?: string;
   voiceSettings: VoiceSettings;
   pushSubscription?: unknown;
+  pushSubscriptionEncrypted?: string;
   pushSubscriptionUpdatedAt?: string;
   reminderSettings?: ReminderSettings;
   behaviorProfile?: BehaviorProfile;

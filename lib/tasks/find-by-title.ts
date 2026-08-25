@@ -1,44 +1,35 @@
 import type { Collection } from "mongodb";
 import type { TaskDocument } from "@/lib/db/models/Task";
+import { decryptTaskDocument } from "@/lib/privacy/taskEncryption";
 
 export async function findTasksByTitle(
   tasks: Collection<TaskDocument>,
   userId: string,
   title: string,
-  limit = 5
+  limit = 5,
 ): Promise<TaskDocument[]> {
   const cleaned = title.trim();
   if (!cleaned) return [];
-
-  const exact = await tasks
-    .find({ createdBy: userId, title: { $regex: new RegExp(`^${escapeRegex(cleaned)}$`, "i") }, status: { $ne: "cancelled" } })
-    .limit(limit)
-    .toArray();
-  if (exact.length) return exact;
-
-  const partial = await tasks
-    .find({ createdBy: userId, title: { $regex: new RegExp(escapeRegex(cleaned), "i") }, status: { $ne: "cancelled" } })
-    .limit(limit)
-    .toArray();
-  if (partial.length) return partial;
-
-  const words = cleaned.split(/\s+/).filter((word) => word.length > 2);
-  if (!words.length) return [];
-  const pattern = words.map(escapeRegex).join(".*");
-  return tasks
-    .find({ createdBy: userId, title: { $regex: new RegExp(pattern, "i") }, status: { $ne: "cancelled" } })
-    .limit(limit)
-    .toArray();
+  const candidates = await tasks.find({ createdBy: userId, status: { $ne: "cancelled" } }).sort({ updatedAt: -1 }).limit(500).toArray();
+  const lowered = cleaned.toLowerCase();
+  const words = lowered.split(/\s+/).filter((word) => word.length > 2);
+  return candidates
+    .map((candidate) => {
+      const task = decryptTaskDocument(candidate);
+      const candidateTitle = String(task.title ?? "").toLowerCase();
+      const score = candidateTitle === lowered ? 3 : candidateTitle.includes(lowered) ? 2 : words.length && words.every((word) => candidateTitle.includes(word)) ? 1 : 0;
+      return { task, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((item) => item.task);
 }
 
 export async function findTaskByTitle(
   tasks: Collection<TaskDocument>,
   userId: string,
-  title: string
+  title: string,
 ): Promise<TaskDocument | null> {
   return (await findTasksByTitle(tasks, userId, title, 1))[0] ?? null;
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

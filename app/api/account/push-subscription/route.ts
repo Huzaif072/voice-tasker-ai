@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth/middleware";
 import { connectWithRetry } from "@/lib/db/mongodb";
 import { getUsersCollection } from "@/lib/db/models/User";
 import { pushSubscriptionSchema } from "@/lib/validators/account";
+import { encryptUserJson } from "@/lib/privacy/fieldEncryption";
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
@@ -14,10 +15,10 @@ export async function GET(request: Request) {
     const db = await connectWithRetry();
     const user = await (await getUsersCollection(db)).findOne(
       { _id: new ObjectId(auth.user.id) },
-      { projection: { pushSubscription: 1 } },
+      { projection: { pushSubscription: 1, pushSubscriptionEncrypted: 1 } },
     );
     if (!user) return NextResponse.json({ error: "Account not found" }, { status: 404 });
-    return NextResponse.json({ configured: Boolean(process.env.VAPID_PUBLIC_KEY), subscribed: Boolean(user.pushSubscription), publicKey: process.env.VAPID_PUBLIC_KEY ?? null });
+    return NextResponse.json({ configured: Boolean(process.env.VAPID_PUBLIC_KEY), subscribed: Boolean(user.pushSubscriptionEncrypted ?? user.pushSubscription), publicKey: process.env.VAPID_PUBLIC_KEY ?? null });
   } catch (error) {
     console.error("Push subscription lookup error:", error);
     return NextResponse.json({ error: "Unable to load push notification status" }, { status: 503 });
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     const db = await connectWithRetry();
     const result = await (await getUsersCollection(db)).updateOne(
       { _id: new ObjectId(auth.user.id) },
-      { $set: { pushSubscription: parsed.data, pushSubscriptionUpdatedAt: new Date().toISOString() } },
+      { $set: { pushSubscriptionEncrypted: encryptUserJson(parsed.data), pushSubscriptionUpdatedAt: new Date().toISOString() }, $unset: { pushSubscription: "" } },
     );
     if (!result.matchedCount) return NextResponse.json({ error: "Account not found" }, { status: 404 });
     return NextResponse.json({ subscribed: true });
@@ -64,7 +65,7 @@ export async function DELETE(request: Request) {
     const db = await connectWithRetry();
     const result = await (await getUsersCollection(db)).updateOne(
       { _id: new ObjectId(auth.user.id) },
-      { $unset: { pushSubscription: "", pushSubscriptionUpdatedAt: "" } },
+      { $unset: { pushSubscription: "", pushSubscriptionEncrypted: "", pushSubscriptionUpdatedAt: "" } },
     );
     if (!result.matchedCount) return NextResponse.json({ error: "Account not found" }, { status: 404 });
     return NextResponse.json({ subscribed: false });

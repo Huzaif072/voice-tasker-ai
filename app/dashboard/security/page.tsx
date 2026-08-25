@@ -27,7 +27,7 @@ export default function SecurityPage() {
   const [savingReminders, setSavingReminders] = useState(false);
   const [locationTriggersEnabled, setLocationTriggersEnabled] = useState(false);
   const [providerHealth, setProviderHealth] = useState<ProviderHealth | null>(null);
-  const [consentStatus, setConsentStatus] = useState<{ accepted: boolean; current: { privacyPolicyVersion: string; termsVersion: string } } | null>(null);
+  const [consentStatus, setConsentStatus] = useState<{ accepted: boolean; current: { privacyPolicyVersion: string; termsVersion: string }; consent?: { privacyConsentRevokedAt?: string } } | null>(null);
 
   useEffect(() => {
     if (window.localStorage.getItem(contextLocationStorageKey) === "true") queueMicrotask(() => setLocationTriggersEnabled(true));
@@ -55,7 +55,7 @@ export default function SecurityPage() {
   useEffect(() => {
     fetch("/api/account/consent")
       .then((response) => (response.ok ? response.json() : null))
-      .then((data) => { if (data) setConsentStatus({ accepted: Boolean(data.accepted), current: data.current }); })
+      .then((data) => { if (data) setConsentStatus({ accepted: Boolean(data.accepted), current: data.current, consent: data.consent }); })
       .catch(() => undefined);
   }, []);
 
@@ -111,12 +111,41 @@ export default function SecurityPage() {
       const response = await fetch("/api/account/consent", { method: "POST" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Unable to save consent");
-      setConsentStatus({ accepted: true, current: { privacyPolicyVersion: data.privacyPolicyVersion, termsVersion: data.termsVersion } });
+      setConsentStatus({ accepted: true, current: { privacyPolicyVersion: data.privacyPolicyVersion, termsVersion: data.termsVersion }, consent: {} });
       setMessage("Your Terms and Privacy Policy consent was recorded.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save consent.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function revokeConsent() {
+    if (!window.confirm("Withdraw policy consent? You can renew it later; account deletion remains available for complete erasure.")) return;
+    setLoading(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/account/consent", { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to withdraw consent");
+      setConsentStatus((current) => current ? { ...current, accepted: false, consent: { privacyConsentRevokedAt: data.revokedAt } } : current);
+      setMessage("Policy consent was withdrawn.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to withdraw consent.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitPrivacyRequest(type: "access" | "erasure" | "rectification" | "restriction" | "objection") {
+    const details = window.prompt("Optional details for this privacy request:", "") ?? "";
+    try {
+      const response = await fetch("/api/account/privacy-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, details }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to submit privacy request");
+      setMessage(`Privacy request received: ${data.requestId}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to submit privacy request.");
     }
   }
 
@@ -249,12 +278,13 @@ export default function SecurityPage() {
         <p className="mt-2 text-sm text-slate-400">Review the current policy versions recorded for your account. Your consent history is included in account exports.</p>
         <p className="mt-3 text-sm text-slate-300">Status: {consentStatus?.accepted ? "Current" : "Needs review"}</p>
         {consentStatus ? <p className="mt-1 text-xs text-slate-500">Privacy {consentStatus.current.privacyPolicyVersion} · Terms {consentStatus.current.termsVersion}</p> : null}
-        <Button className="mt-4" onClick={renewConsent} loading={loading}>Review and accept current policies</Button>
+        <div className="mt-4 flex flex-wrap gap-3"><Button onClick={renewConsent} loading={loading}>Review and accept current policies</Button><Button variant="ghost" onClick={revokeConsent} loading={loading} disabled={!consentStatus?.accepted}>Withdraw consent</Button></div>
       </section>
       <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
-        <h2 className="text-lg font-semibold text-slate-100">Your data</h2>
-        <p className="mt-2 text-sm text-slate-400">Download a JSON copy of your profile, tasks, notifications, and voice history.</p>
-        <Button className="mt-4" onClick={exportAccount} loading={exporting}>Export account data</Button>
+        <h2 className="text-lg font-semibold text-slate-100">Your data rights</h2>
+        <p className="mt-2 text-sm text-slate-400">Export or request access, correction, restriction, objection, or erasure of your personal data. Requests are recorded for follow-up by the service operator.</p>
+        <div className="mt-4 flex flex-wrap gap-2"><Button size="sm" onClick={() => submitPrivacyRequest("access")}>Request access</Button><Button size="sm" variant="ghost" onClick={() => submitPrivacyRequest("rectification")}>Request correction</Button><Button size="sm" variant="ghost" onClick={() => submitPrivacyRequest("restriction")}>Restrict processing</Button><Button size="sm" variant="ghost" onClick={() => submitPrivacyRequest("objection")}>Object to processing</Button></div>
+        <Button className="mt-3" onClick={exportAccount} loading={exporting}>Export account data</Button>
       </section>
       <section className="mt-6 rounded-2xl border border-rose-900/50 bg-rose-950/20 p-6">
         <h2 className="text-lg font-semibold text-slate-100">Log out all devices</h2>

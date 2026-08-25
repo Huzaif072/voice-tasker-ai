@@ -15,6 +15,7 @@ import { buildCalendarComposeLink } from "@/lib/calendar/link";
 import { createAssignmentNotification, findAssignableUser } from "@/lib/tasks/assignments";
 import { recordRealtimeEvent } from "@/lib/realtime/events";
 import { getTaskInvitationsCollection } from "@/lib/db/models/TaskInvitation";
+import { decryptTaskDocument, encryptedTaskUpdate, stripEncryptedTaskFields } from "@/lib/privacy/taskEncryption";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -62,14 +63,17 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const { baseUpdatedAt, ...parsedUpdateFields } = parsed.data;
+  const contentUpdates = { ...parsedUpdateFields } as Partial<Task>;
   const updateFields = { ...parsedUpdateFields } as typeof parsedUpdateFields & { delegationStatus?: "none" | "pending" };
   const unsetFields: Record<string, ""> = {};
   if (updateFields.delegatedTo === "") {
     delete updateFields.delegatedTo;
+    contentUpdates.delegatedTo = undefined;
     unsetFields.delegatedTo = "";
   }
   if (updateFields.delegatedPhone === "") {
     delete updateFields.delegatedPhone;
+    contentUpdates.delegatedPhone = undefined;
     unsetFields.delegatedPhone = "";
   }
   if (updateFields.dueDate === "") {
@@ -85,8 +89,9 @@ export async function PATCH(request: Request, { params }: Params) {
   try {
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
-    const existing = await tasks.findOne({ _id: new ObjectId(id), $or: [{ createdBy: auth.user.id }, { assigneeUserId: auth.user.id }] }, { projection: { status: 1, priority: 1, title: 1, durationMinutes: 1, updatedAt: 1, createdBy: 1, assigneeUserId: 1 } });
-    if (!existing) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    const storedExisting = await tasks.findOne({ _id: new ObjectId(id), $or: [{ createdBy: auth.user.id }, { assigneeUserId: auth.user.id }] }, { projection: { status: 1, priority: 1, title: 1, durationMinutes: 1, updatedAt: 1, createdBy: 1, assigneeUserId: 1, contentEncrypted: 1, description: 1, calendarQuery: 1, subtasks: 1, contextTriggers: 1, tags: 1, delegatedTo: 1, delegatedPhone: 1 } });
+    if (!storedExisting) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    const existing = decryptTaskDocument(storedExisting) as typeof storedExisting & Partial<Task>;
     const isOwner = existing.createdBy === auth.user.id;
     const recipientEditableFields = new Set(["status", "subtasks", "baseUpdatedAt"]);
     if (!isOwner && Object.keys(parsed.data).some((field) => !recipientEditableFields.has(field))) return NextResponse.json({ error: "Only the task owner can edit this task" }, { status: 403 });
@@ -108,11 +113,12 @@ export async function PATCH(request: Request, { params }: Params) {
       }
     }
     if (unsetFields.delegatedTo && unsetFields.delegatedPhone) updateFields.delegationStatus = "none";
+    const encryptedUpdate = encryptedTaskUpdate(existing, contentUpdates);
     const result = await tasks.findOneAndUpdate(
       { _id: new ObjectId(id), $or: [{ createdBy: auth.user.id }, { assigneeUserId: auth.user.id }] },
       {
-        $set: { ...updateFields, updatedAt: new Date().toISOString() },
-        ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}),
+        $set: { ...stripEncryptedTaskFields(updateFields), ...encryptedUpdate.$set, updatedAt: new Date().toISOString() },
+        $unset: { ...unsetFields, ...encryptedUpdate.$unset },
       },
       { returnDocument: "after" }
     );

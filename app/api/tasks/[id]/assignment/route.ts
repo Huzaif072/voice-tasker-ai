@@ -8,6 +8,7 @@ import { createAssignmentStatusNotification } from "@/lib/tasks/assignments";
 import { invalidateCache } from "@/lib/redis/ratelimit";
 import { recordRealtimeEvent } from "@/lib/realtime/events";
 import { z } from "zod";
+import { decryptTaskDocument } from "@/lib/privacy/taskEncryption";
 
 type Params = { params: Promise<{ id: string }> };
 const assignmentActionSchema = z.object({ action: z.enum(["accept", "decline"]) });
@@ -25,8 +26,9 @@ export async function POST(request: Request, { params }: Params) {
   try {
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
-    const task = await tasks.findOne({ _id: new ObjectId(id), assigneeUserId: auth.user.id });
-    if (!task) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+    const storedTask = await tasks.findOne({ _id: new ObjectId(id), assigneeUserId: auth.user.id });
+    if (!storedTask) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+    const task = decryptTaskDocument(storedTask);
     if (task.assignmentStatus !== "pending") return NextResponse.json({ error: "Assignment has already been resolved", status: task.assignmentStatus }, { status: 409 });
     const status = parsed.data.action === "accept" ? "accepted" : "declined";
     await tasks.updateOne(

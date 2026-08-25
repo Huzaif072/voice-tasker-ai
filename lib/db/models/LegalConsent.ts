@@ -6,6 +6,7 @@ export interface LegalConsentDocument {
   privacyPolicyVersion: string;
   termsVersion: string;
   acceptedAt: string;
+  action?: "accepted" | "withdrawn";
   source: "signup" | "account" | "oauth";
 }
 

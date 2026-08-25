@@ -1,9 +1,11 @@
 import type { AssignmentStatus, Task, TaskPriority, TaskStatus } from "@/types/task";
+import { decryptTaskDocument } from "@/lib/privacy/taskEncryption";
 
 const priorities: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const statuses: TaskStatus[] = ["pending", "in_progress", "completed", "cancelled"];
 
 export function normalizeTask(input: Partial<Task>): Task {
+  input = decryptTaskDocument(input as Partial<Task> & { contentEncrypted?: string });
   const priority = priorities.includes(input.priority as TaskPriority)
     ? (input.priority as TaskPriority)
     : "medium";

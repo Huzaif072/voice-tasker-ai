@@ -16,6 +16,7 @@ export function sanitizeUserForExport(user: UserDocument) {
     ...(user.termsVersion ? { termsVersion: user.termsVersion } : {}),
     ...(user.privacyConsentAt ? { privacyConsentAt: user.privacyConsentAt } : {}),
     ...(user.termsAcceptedAt ? { termsAcceptedAt: user.termsAcceptedAt } : {}),
+    ...(user.privacyConsentRevokedAt ? { privacyConsentRevokedAt: user.privacyConsentRevokedAt } : {}),
     createdAt: user.createdAt,
   };
 }

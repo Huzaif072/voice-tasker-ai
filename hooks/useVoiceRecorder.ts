@@ -82,7 +82,7 @@ export function useVoiceRecorder() {
   );
 
   const processAudio = useCallback(
-    async (blob: Blob) => {
+    async (chunks: Blob[], mimeType: string) => {
       if (processingRef.current) return;
       processingRef.current = true;
       requestRef.current?.abort();
@@ -90,12 +90,23 @@ export function useVoiceRecorder() {
       requestRef.current = controller;
       dispatch(setProcessing(true));
       try {
-        const form = new FormData();
-        form.append("audio", blob, `voice-command.${(blob.type || "audio/webm").split("/")[1]?.split(";")[0] ?? "webm"}`);
-        if (conversationIdRef.current) form.append("conversationId", conversationIdRef.current);
+        let uploadId: string | undefined;
+        for (const [index, chunk] of chunks.entries()) {
+          const form = new FormData();
+          form.append("chunk", chunk, `voice-chunk-${index}.webm`);
+          form.append("index", String(index));
+          form.append("mimeType", mimeType || "audio/webm");
+          if (uploadId) form.append("uploadId", uploadId);
+          const chunkResponse = await fetch("/api/voice/chunk", { method: "POST", body: form, signal: controller.signal });
+          const chunkData = await chunkResponse.json();
+          if (!chunkResponse.ok) throw new Error(chunkData.error ?? "Voice upload failed");
+          uploadId = chunkData.uploadId;
+        }
+        if (!uploadId) throw new Error("No audio chunks were captured");
         const res = await fetch("/api/voice/input", {
           method: "POST",
-          body: form,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uploadId, conversationId: conversationIdRef.current ?? undefined }),
           signal: controller.signal,
         });
         const data = await res.json();
@@ -136,9 +147,8 @@ export function useVoiceRecorder() {
         if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
         recordingTimeoutRef.current = null;
         stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        if (blob.size < 1000) { dispatch(setVoiceError("Audio too short. Please speak longer.")); return; }
-        await processAudio(blob);
+        if (recordingBytesRef.current < 1000) { dispatch(setVoiceError("Audio too short. Please speak longer.")); return; }
+        await processAudio(chunksRef.current, recorder.mimeType || "audio/webm");
       };
       mediaRecorderRef.current = recorder;
       recorder.start(250);

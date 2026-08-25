@@ -11,6 +11,7 @@ import { createAssignmentNotification, findAssignableUser } from "@/lib/tasks/as
 import { recordRealtimeEvent } from "@/lib/realtime/events";
 import { buildInvitationUrl, createTaskInvitation } from "@/lib/tasks/invitations";
 import { getTaskInvitationsCollection } from "@/lib/db/models/TaskInvitation";
+import { decryptTaskDocument, encryptedTaskUpdate } from "@/lib/privacy/taskEncryption";
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
@@ -47,9 +48,10 @@ export async function POST(request: Request) {
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
     const taskFilter = { _id: new ObjectId(taskId), createdBy: auth.user.id };
-    const task = await tasks.findOne(taskFilter);
+    const storedTask = await tasks.findOne(taskFilter);
 
-    if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    if (!storedTask) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    const task = decryptTaskDocument(storedTask);
     const recipient = await findAssignableUser(db, email);
     let invitationUrl: string | undefined;
     let invitationExpiresAt: Date | undefined;
@@ -61,17 +63,17 @@ export async function POST(request: Request) {
       invitationExpiresAt = invitation.expiresAt;
     }
 
+    const encryptedUpdate = encryptedTaskUpdate(task, { delegatedTo: email ?? task.delegatedTo, delegatedPhone: phone ?? task.delegatedPhone });
     const updated = await tasks.updateOne(
       taskFilter,
       {
         $set: {
-          ...(email ? { delegatedTo: email } : {}),
-          ...(phone ? { delegatedPhone: phone } : {}),
+          ...encryptedUpdate.$set,
           ...(recipient?._id ? { assigneeUserId: recipient._id.toString(), assignmentStatus: "pending" as const } : { assignmentStatus: invitationUrl ? "pending" as const : "none" as const }),
           delegationStatus: "pending",
           updatedAt: new Date().toISOString(),
         },
-        ...(recipient?._id ? {} : { $unset: { assigneeUserId: "" } }),
+        $unset: { ...encryptedUpdate.$unset, ...(recipient?._id ? {} : { assigneeUserId: "" }) },
       }
     );
     if (updated.matchedCount === 0) {

@@ -8,6 +8,7 @@ import { createAssignmentStatusNotification } from "@/lib/tasks/assignments";
 import { findTaskInvitation } from "@/lib/tasks/invitations";
 import { recordRealtimeEvent } from "@/lib/realtime/events";
 import { z } from "zod";
+import { decryptTaskDocument } from "@/lib/privacy/taskEncryption";
 
 type Params = { params: Promise<{ token: string }> };
 const actionSchema = z.object({ action: z.enum(["accept", "decline"]) });
@@ -51,8 +52,9 @@ export async function POST(request: Request, { params }: Params) {
 
     const status = parsed.data.action === "accept" ? "accepted" : "declined";
     const tasks = await getTasksCollection(db);
-    const task = await tasks.findOne({ _id: new ObjectId(invitation.taskId), createdBy: invitation.ownerId });
-    if (!task) return NextResponse.json({ error: "Task no longer exists" }, { status: 404 });
+    const storedTask = await tasks.findOne({ _id: new ObjectId(invitation.taskId), createdBy: invitation.ownerId });
+    if (!storedTask) return NextResponse.json({ error: "Task no longer exists" }, { status: 404 });
+    const task = decryptTaskDocument(storedTask);
     if (task.assigneeUserId && task.assigneeUserId !== auth.user.id) return NextResponse.json({ error: "Task is already assigned" }, { status: 409 });
     await tasks.updateOne(
       { _id: task._id, createdBy: invitation.ownerId },

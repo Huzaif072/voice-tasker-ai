@@ -1,7 +1,7 @@
 import type { Db, Collection, ObjectId } from "mongodb";
 import type { Task } from "@/types/task";
 
-export type TaskDocument = Omit<Task, "_id"> & { _id?: ObjectId };
+export type TaskDocument = Omit<Task, "_id"> & { _id?: ObjectId; contentEncrypted?: string };
 
 export const TASKS_COLLECTION = "tasks";
 let indexesPromise: Promise<void> | null = null;

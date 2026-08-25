@@ -8,7 +8,8 @@ export interface ReminderDeliveryDocument {
   reminderKey: string;
   userId: string;
   taskId: string;
-  taskTitle: string;
+  taskTitle?: string;
+  taskTitleEncrypted?: string;
   channel: ReminderDeliveryChannel;
   status: ReminderDeliveryStatus;
   attempts: number;

@@ -5,6 +5,8 @@ import { getNotificationsCollection } from "@/lib/db/models/Notification";
 import { getUsersCollection } from "@/lib/db/models/User";
 import { getUpcomingCalendarEvents } from "@/lib/calendar/google";
 import type { ContextTrigger } from "@/types/task";
+import { decryptTaskDocument, encryptedTaskUpdate } from "@/lib/privacy/taskEncryption";
+import { encryptUserText } from "@/lib/privacy/fieldEncryption";
 
 interface Position { latitude: number; longitude: number }
 interface Weather { temperature?: number; precipitation?: number; rain?: number; weatherCode?: number }
@@ -109,7 +111,7 @@ export async function evaluateContextTriggers(db: Db, userId: string, position?:
   const notifications = await getNotificationsCollection(db);
   const users = await getUsersCollection(db);
   const user = ObjectId.isValid(userId) ? await users.findOne({ _id: new ObjectId(userId) }).catch(() => null) : null;
-  const activeTasks = await tasks.find({ createdBy: userId, status: { $nin: ["completed", "cancelled"] }, "contextTriggers.0": { $exists: true } }).toArray();
+  const activeTasks = (await tasks.find({ createdBy: userId, status: { $nin: ["completed", "cancelled"] } }).toArray()).map(decryptTaskDocument).filter((task) => Array.isArray(task.contextTriggers) && task.contextTriggers.length > 0);
   const weatherByLocation = await getWeatherByLocation(activeTasks);
   const calendarEvents = user ? await getUpcomingCalendarEvents(user, users).catch(() => []) : [];
   const now = new Date();
@@ -138,12 +140,15 @@ export async function evaluateContextTriggers(db: Db, userId: string, position?:
       const reminderKey = `context:${task._id?.toString()}:${trigger.type}:${trigger.value}:${occurrence}`;
       await notifications.updateOne(
         { userId, reminderKey },
-        { $setOnInsert: { userId, type: "context_trigger", title: "Context reminder", message: `Context matched for task: ${task.title}`, read: false, taskId: task._id?.toString(), reminderKey, createdAt: now.toISOString() } },
+        { $setOnInsert: { userId, type: "context_trigger", title: "Context reminder", message: encryptUserText(`Context matched for task: ${task.title}`), read: false, taskId: task._id?.toString(), reminderKey, createdAt: now.toISOString() } },
         { upsert: true },
       );
       nextTriggers.push({ ...trigger, lastTriggeredAt: now.toISOString() });
     }
-    if (changed) await tasks.updateOne({ _id: task._id, createdBy: userId }, { $set: { contextTriggers: nextTriggers, updatedAt: now.toISOString() } });
+    if (changed) {
+      const encryptedUpdate = encryptedTaskUpdate(task, { contextTriggers: nextTriggers });
+      await tasks.updateOne({ _id: task._id, createdBy: userId }, { $set: { ...encryptedUpdate.$set, updatedAt: now.toISOString() }, $unset: encryptedUpdate.$unset });
+    }
   }
   return { evaluated: activeTasks.length, matched };
 }

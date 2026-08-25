@@ -6,6 +6,7 @@ import { generateSummary } from "@/lib/groq/summarizer";
 import { getCached, setCache } from "@/lib/redis/ratelimit";
 import { summaryInputSchema } from "@/lib/validators/ai";
 import { trackEvent } from "@/lib/analytics/events";
+import { normalizeTask } from "@/lib/tasks/normalize";
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
     const userTasks = (await tasks.find({ createdBy: auth.user.id }).limit(50).toArray()).map(
-      (t) => ({ ...t, _id: t._id?.toString() })
+      (t) => normalizeTask({ ...t, _id: t._id?.toString() })
     );
 
     const summary = await generateSummary(userTasks, period);

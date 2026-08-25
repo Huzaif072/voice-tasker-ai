@@ -12,6 +12,8 @@ import { accountDeleteSchema } from "@/lib/validators/account";
 import { getTaskInvitationsCollection } from "@/lib/db/models/TaskInvitation";
 import { getLegalConsentsCollection } from "@/lib/db/models/LegalConsent";
 import { getAnalyticsCollection } from "@/lib/analytics/events";
+import { getPrivacyRequestsCollection } from "@/lib/db/models/PrivacyRequest";
+import { getVoiceChunksCollection, getVoiceUploadsCollection } from "@/lib/db/models/VoiceUpload";
 
 function isTransactionUnsupported(error: unknown): boolean {
   const code = (error as { code?: number }).code;
@@ -20,7 +22,7 @@ function isTransactionUnsupported(error: unknown): boolean {
 }
 
 async function deleteAccountData(db: Db, userId: ObjectId, ownerId: string, email: string, session?: ClientSession) {
-  const [users, tasks, notifications, sessions, deliveries, invitations, consents, analytics] = await Promise.all([
+  const [users, tasks, notifications, sessions, deliveries, invitations, consents, analytics, privacyRequests, voiceUploads, voiceChunks] = await Promise.all([
     getUsersCollection(db),
     getTasksCollection(db),
     getNotificationsCollection(db),
@@ -29,6 +31,9 @@ async function deleteAccountData(db: Db, userId: ObjectId, ownerId: string, emai
     getTaskInvitationsCollection(db),
     getLegalConsentsCollection(db),
     getAnalyticsCollection(db),
+    getPrivacyRequestsCollection(db),
+    getVoiceUploadsCollection(db),
+    getVoiceChunksCollection(db),
   ]);
   const options = session ? { session } : undefined;
 
@@ -39,6 +44,9 @@ async function deleteAccountData(db: Db, userId: ObjectId, ownerId: string, emai
   await invitations.deleteMany({ $or: [{ ownerId }, { recipientEmail: email.toLowerCase() }] }, options);
   await consents.deleteMany({ userId: ownerId }, options);
   await analytics.deleteMany({ userId: ownerId }, options);
+  await privacyRequests.deleteMany({ userId: ownerId }, options);
+  await voiceUploads.deleteMany({ userId: ownerId }, options);
+  await voiceChunks.deleteMany({ userId: ownerId }, options);
   const deleted = await users.deleteOne({ _id: userId }, options);
   if (deleted.deletedCount === 0) throw new Error("ACCOUNT_NOT_FOUND");
 }

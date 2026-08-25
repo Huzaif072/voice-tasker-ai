@@ -5,8 +5,9 @@ import { getUsersCollection, defaultReminderSettings, type UserDocument } from "
 import { getReminderDeliveriesCollection, type ReminderDeliveryDocument } from "@/lib/db/models/ReminderDelivery";
 import { sendEmailResult } from "@/lib/notifications/email";
 import { sendPushNotificationResult } from "@/lib/notifications/push";
-import { encryptUserText } from "@/lib/privacy/fieldEncryption";
+import { decryptUserJson, decryptUserText, encryptUserText } from "@/lib/privacy/fieldEncryption";
 import { notificationExpiresAt } from "@/lib/privacy/retention";
+import { decryptTaskDocument } from "@/lib/privacy/taskEncryption";
 
 const MAX_REMINDERS_PER_RUN = 100;
 const MAX_DELIVERIES_PER_RUN = 100;
@@ -58,7 +59,7 @@ async function queueDelivery(
           reminderKey,
           userId: task.createdBy,
           taskId: task._id.toString(),
-          taskTitle: task.title,
+          taskTitleEncrypted: encryptUserText(task.title),
           channel,
           status: "pending",
           attempts: 0,
@@ -105,18 +106,19 @@ async function deliver(
   user: UserDocument | undefined,
 ): Promise<{ sent: boolean; permanentFailure: boolean; error?: string }> {
   if (!user) return { sent: false, permanentFailure: true, error: "Owner account no longer exists" };
+  const taskTitle = decryptUserText(delivery.taskTitleEncrypted ?? delivery.taskTitle);
   if (delivery.channel === "email" && user.email) {
     const result = await sendEmailResult({
       to: user.email,
-      subject: `Reminder: ${delivery.taskTitle}`,
-      html: `<p>You asked to be reminded about <strong>${escapeHtml(delivery.taskTitle)}</strong>.</p>`,
+      subject: `Reminder: ${taskTitle}`,
+      html: `<p>You asked to be reminded about <strong>${escapeHtml(taskTitle)}</strong>.</p>`,
     });
     return { sent: result.ok, permanentFailure: result.permanentFailure, error: result.error };
   }
   if (delivery.channel === "push" && user.pushSubscription) {
     const result = await sendPushNotificationResult(user.pushSubscription, {
       title: "Task reminder",
-      body: delivery.taskTitle,
+      body: taskTitle,
       url: `/dashboard/tasks?task=${delivery.taskId}`,
     });
     return { sent: result.ok, permanentFailure: result.permanentFailure, error: result.error };
@@ -129,17 +131,20 @@ export async function processDueReminders(db: Db, now = new Date()): Promise<Rem
   const notifications = await getNotificationsCollection(db);
   const users = await getUsersCollection(db);
   const deliveries = await getReminderDeliveriesCollection(db);
-  const dueTasks = await tasks.find({
+  const dueTasks = (await tasks.find({
     reminderAt: { $type: "string", $lte: now.toISOString() },
     status: { $nin: ["completed", "cancelled"] },
-  }).sort({ reminderAt: 1 }).limit(MAX_REMINDERS_PER_RUN).toArray();
+  }).sort({ reminderAt: 1 }).limit(MAX_REMINDERS_PER_RUN).toArray()).map(decryptTaskDocument);
 
   const ids = dueTasks.map((task) => userObjectId(task.createdBy)).filter((id): id is ObjectId => Boolean(id));
   const userRows = await users.find(
     { _id: { $in: ids } },
-    { projection: { email: 1, pushSubscription: 1, reminderSettings: 1 } },
+    { projection: { email: 1, pushSubscription: 1, pushSubscriptionEncrypted: 1, reminderSettings: 1 } },
   ).toArray();
-  const userById = new Map(userRows.map((user) => [user._id?.toString(), user]));
+  const userById = new Map(userRows.map((user) => {
+    if (user.pushSubscriptionEncrypted) user.pushSubscription = decryptUserJson(user.pushSubscriptionEncrypted);
+    return [user._id?.toString(), user] as const;
+  }));
 
   let created = 0;
   for (const task of dueTasks) {
@@ -197,8 +202,11 @@ export async function processDueReminders(db: Db, now = new Date()): Promise<Rem
     if (!deliveryUser) {
       const id = userObjectId(delivery.userId);
       if (id) {
-        const fetchedUser = await users.findOne({ _id: id }, { projection: { email: 1, pushSubscription: 1 } });
-        if (fetchedUser) deliveryUser = fetchedUser;
+        const fetchedUser = await users.findOne({ _id: id }, { projection: { email: 1, pushSubscription: 1, pushSubscriptionEncrypted: 1 } });
+        if (fetchedUser) {
+          if (fetchedUser.pushSubscriptionEncrypted) fetchedUser.pushSubscription = decryptUserJson(fetchedUser.pushSubscriptionEncrypted);
+          deliveryUser = fetchedUser;
+        }
       }
     }
     const outcome = await deliver(delivery, deliveryUser);

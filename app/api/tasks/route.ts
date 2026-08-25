@@ -6,6 +6,8 @@ import { taskSchema } from "@/lib/validators/task";
 import { getCached, setCache, invalidateCache } from "@/lib/redis/ratelimit";
 import { rateLimit } from "@/lib/redis/ratelimit";
 import type { Task } from "@/types/task";
+import type { TaskDocument } from "@/lib/db/models/Task";
+import { decryptTaskDocument, encryptTaskDocument, taskMatchesSearch } from "@/lib/privacy/taskEncryption";
 import { normalizeTask } from "@/lib/tasks/normalize";
 import { buildTaskFilter, taskCacheKey, taskQuerySchema } from "@/lib/tasks/query";
 import { validateTaskDependencies } from "@/lib/tasks/dependencies";
@@ -37,6 +39,16 @@ export async function GET(request: Request) {
     const tasks = await getTasksCollection(db);
     const filter = buildTaskFilter(auth.user.id, query);
     const skip = (query.page - 1) * query.limit;
+    if (query.search) {
+      const searchFilter = { ...filter };
+      delete searchFilter.$text;
+      const candidates = await tasks.find(searchFilter).sort({ updatedAt: -1, _id: -1 }).limit(5000).toArray();
+      const matched = candidates.map((candidate) => decryptTaskDocument(candidate) as TaskDocument).filter((task) => taskMatchesSearch(task, query.search));
+      const pageRows = matched.slice(skip, skip + query.limit);
+      const response = { tasks: pageRows.map((task) => normalizeTask({ ...task, _id: task._id?.toString() } as Partial<Task>)), page: query.page, limit: query.limit, total: matched.length, hasMore: skip + pageRows.length < matched.length };
+      await setCache(cacheKey, response);
+      return NextResponse.json(response);
+    }
     const [results, total] = await Promise.all([
       tasks.aggregate([
         { $match: filter },
@@ -108,7 +120,7 @@ export async function POST(request: Request) {
       updatedAt: now,
     };
 
-    const result = await tasks.insertOne(taskDoc);
+    const result = await tasks.insertOne(encryptTaskDocument(taskDoc) as TaskDocument);
     await recordRealtimeEvent(db, auth.user.id, "task_created", result.insertedId.toString());
     if (recipient?._id) {
       await createAssignmentNotification(db, recipient._id.toString(), result.insertedId.toString(), parsed.data.title, auth.user.name);
