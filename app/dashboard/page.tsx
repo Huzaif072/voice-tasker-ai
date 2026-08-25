@@ -10,29 +10,41 @@ import { TaskForm } from "@/components/dashboard/TaskForm";
 import { Button } from "@/components/ui/Button";
 import { useTasks, useUpdateTask, useDeleteTask, useCreateTask } from "@/hooks/useTasks";
 import { useAuth } from "@/hooks/useAuth";
+import { useDashboardSearch } from "@/hooks/useDashboardSearch";
 import type { Task } from "@/types/task";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { data: tasks = [], isLoading } = useTasks();
+  const { data: tasks = [], isLoading, isError, refetch } = useTasks();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const createTask = useCreateTask();
   const [filter, setFilter] = useState<TaskFilter>("All");
   const [showForm, setShowForm] = useState(false);
+  const { search } = useDashboardSearch();
 
   const filtered = useMemo(() => {
-    switch (filter) {
-      case "Active":
-        return tasks.filter((t) => t.status !== "completed");
-      case "Completed":
-        return tasks.filter((t) => t.status === "completed");
-      case "High Priority":
-        return tasks.filter((t) => t.priority === "high" || t.priority === "urgent");
-      default:
-        return tasks;
-    }
-  }, [tasks, filter]);
+    const normalizedSearch = search.trim().toLowerCase();
+    const byFilter = (() => {
+      switch (filter) {
+        case "Active":
+          return tasks.filter((t) => t.status !== "completed");
+        case "Completed":
+          return tasks.filter((t) => t.status === "completed");
+        case "High Priority":
+          return tasks.filter((t) => t.priority === "high" || t.priority === "urgent");
+        default:
+          return tasks;
+      }
+    })();
+
+    if (!normalizedSearch) return byFilter;
+    return byFilter.filter((task) =>
+      [task.title, task.description, ...task.tags]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(normalizedSearch))
+    );
+  }, [tasks, filter, search]);
 
   const stats = useMemo(() => {
     const today = new Date().toDateString();
@@ -86,7 +98,13 @@ export default function DashboardPage() {
       <div className="mt-8">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-slate-100">Recent Tasks</h3>
-          <Button size="sm" onClick={() => setShowForm(true)}>
+          <Button
+            size="sm"
+            onClick={() => {
+              createTask.reset();
+              setShowForm(true);
+            }}
+          >
             <Plus className="h-4 w-4" />
             Add Task
           </Button>
@@ -94,10 +112,18 @@ export default function DashboardPage() {
         <TaskFilters active={filter} onChange={setFilter} />
         <div className="mt-4">
           {isLoading ? (
-            <p className="text-slate-400">Loading tasks...</p>
+            <p className="text-slate-400" role="status">Loading tasks...</p>
+          ) : isError ? (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center">
+              <p className="text-sm text-red-300" role="alert">We couldn’t load your tasks.</p>
+              <button type="button" onClick={() => refetch()} className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500">
+                Try again
+              </button>
+            </div>
           ) : (
             <TaskList
               tasks={filtered as Task[]}
+              emptyMessage={search.trim() ? "No tasks match your search." : undefined}
               onToggle={handleToggle}
               onDelete={(id) => deleteTask.mutate(id)}
             />
@@ -106,22 +132,27 @@ export default function DashboardPage() {
       </div>
 
       <TaskForm
+        key={showForm ? "task-form-open" : "task-form-closed"}
         open={showForm}
-        onClose={() => setShowForm(false)}
-        onSubmit={(data) =>
-          createTask.mutate({
-            title: data.title,
-            description: data.description,
-            priority: data.priority as Task["priority"],
-            status: "pending",
-            subtasks: [],
-            tags: [],
-            contextTriggers: [],
-            createdBy: user?.id ?? "",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          })
-        }
+        onClose={() => {
+          if (!createTask.isPending) setShowForm(false);
+        }}
+        submitting={createTask.isPending}
+        error={createTask.isError ? (createTask.error instanceof Error ? createTask.error.message : "Unable to create task") : null}
+        onSubmit={(data) => {
+          const dueDate = data.dueDate ? new Date(data.dueDate).toISOString() : undefined;
+          createTask.mutate(
+            {
+              title: data.title,
+              description: data.description,
+              priority: data.priority,
+              dueDate,
+              tags: data.tags,
+              delegatedTo: data.delegatedTo,
+            },
+            { onSuccess: () => setShowForm(false) }
+          );
+        }}
       />
     </motion.div>
   );

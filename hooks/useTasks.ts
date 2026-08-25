@@ -24,7 +24,10 @@ export function useCreateTask() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(task),
       });
-      if (!res.ok) throw new Error("Failed to create task");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "Failed to create task");
+      }
       return res.json();
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),

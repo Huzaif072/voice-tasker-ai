@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseNotificationId } from "@/lib/notifications/ids";
 import { requireAuth } from "@/lib/auth/middleware";
 import { connectWithRetry } from "@/lib/db/mongodb";
 import { getNotificationsCollection } from "@/lib/db/models/Notification";
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
       notifications: items.map((n) => ({ ...n, _id: n._id?.toString() })),
     });
   } catch {
-    return NextResponse.json({ notifications: [] });
+    return NextResponse.json({ error: "Failed to load notifications" }, { status: 503 });
   }
 }
 
@@ -28,10 +29,32 @@ export async function PATCH(request: Request) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
 
-  const { id } = await request.json();
-  const db = await connectWithRetry();
-  const notifications = await getNotificationsCollection(db);
-  await notifications.updateOne({ _id: id, userId: auth.user.id }, { $set: { read: true } });
+  let id: unknown;
+  try {
+    ({ id } = await request.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-  return NextResponse.json({ success: true });
+  const notificationId = parseNotificationId(id);
+  if (!notificationId) {
+    return NextResponse.json({ error: "Invalid notification ID" }, { status: 400 });
+  }
+
+  try {
+    const db = await connectWithRetry();
+    const notifications = await getNotificationsCollection(db);
+    const result = await notifications.updateOne(
+      { _id: notificationId, userId: auth.user.id },
+      { $set: { read: true } }
+    );
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "Notification not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Failed to update notification" }, { status: 503 });
+  }
 }

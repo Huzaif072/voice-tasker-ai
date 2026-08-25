@@ -6,25 +6,37 @@ import { TaskList } from "@/components/dashboard/TaskList";
 import { TaskFilters, type TaskFilter } from "@/components/dashboard/TaskFilters";
 import { useTasks, useUpdateTask, useDeleteTask } from "@/hooks/useTasks";
 import type { Task } from "@/types/task";
+import { useDashboardSearch } from "@/hooks/useDashboardSearch";
 
 export default function TasksPage() {
   const { data: tasks = [], isLoading, isError, refetch } = useTasks();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const [filter, setFilter] = useState<TaskFilter>("All");
+  const { search } = useDashboardSearch();
 
   const filtered = useMemo(() => {
-    switch (filter) {
-      case "Active":
-        return tasks.filter((t) => t.status !== "completed");
-      case "Completed":
-        return tasks.filter((t) => t.status === "completed");
-      case "High Priority":
-        return tasks.filter((t) => t.priority === "high" || t.priority === "urgent");
-      default:
-        return tasks;
-    }
-  }, [tasks, filter]);
+    const normalizedSearch = search.trim().toLowerCase();
+    const byFilter = (() => {
+      switch (filter) {
+        case "Active":
+          return tasks.filter((t) => t.status !== "completed");
+        case "Completed":
+          return tasks.filter((t) => t.status === "completed");
+        case "High Priority":
+          return tasks.filter((t) => t.priority === "high" || t.priority === "urgent");
+        default:
+          return tasks;
+      }
+    })();
+
+    if (!normalizedSearch) return byFilter;
+    return byFilter.filter((task) =>
+      [task.title, task.description, ...task.tags]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(normalizedSearch))
+    );
+  }, [tasks, filter, search]);
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -43,6 +55,7 @@ export default function TasksPage() {
         ) : (
           <TaskList
             tasks={filtered as Task[]}
+            emptyMessage={search.trim() ? "No tasks match your search." : undefined}
             onToggle={(id) => {
               const task = tasks.find((t) => t._id === id);
               if (task)

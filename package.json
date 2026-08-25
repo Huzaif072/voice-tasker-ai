@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:auth": "tsx scripts/auth-regression-smoke.test.ts",
     "test:voice": "tsx scripts/voice-regression-smoke.test.ts",
-    "test:tasks": "tsx scripts/tasks-regression-smoke.test.ts"
+    "test:tasks": "tsx scripts/tasks-regression-smoke.test.ts",
+    "test:notifications": "tsx scripts/notifications-regression-smoke.test.ts"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",

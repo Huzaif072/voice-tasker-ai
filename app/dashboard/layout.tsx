@@ -9,6 +9,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import Link from "next/link";
+import { DashboardSearchProvider } from "@/hooks/useDashboardSearch";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -21,8 +22,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-slate-900">
       <Sidebar userName={user?.name} onLogout={logout} />
       <div className="pl-60">
-        <Header unreadCount={0} />
-        <main className="p-8">{children}</main>
+        <DashboardSearchProvider>
+          <Header />
+          <main className="p-8">{children}</main>
+        </DashboardSearchProvider>
       </div>
 
       <div className="fixed bottom-8 right-8 z-50">

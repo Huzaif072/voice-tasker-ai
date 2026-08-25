@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Notification } from "@/types/notification";
 
 export function useNotifications() {
@@ -11,9 +11,35 @@ export function useNotifications() {
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<Notification[]> => {
       const res = await fetch("/api/notifications");
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error("Failed to load notifications");
       const data = await res.json();
-      return data.notifications ?? [];
+      return Array.isArray(data.notifications) ? data.notifications : [];
+    },
+  });
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "Failed to mark notification as read");
+      }
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.setQueryData<Notification[]>(["notifications"], (current = []) =>
+        current.map((notification) =>
+          notification._id === id ? { ...notification, read: true } : notification
+        )
+      );
     },
   });
 }
