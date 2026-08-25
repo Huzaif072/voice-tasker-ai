@@ -1,111 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import type { ContextRecurrence, ContextTrigger, TaskPriority } from "@/types/task";
 
-export interface TaskFormData {
-  title: string;
-  description?: string;
-  priority: TaskPriority;
-  dueDate?: string;
-  reminderAt?: string;
-  tags: string[];
-  dependencies: string[];
-  contextTriggers: ContextTrigger[];
-  delegatedTo?: string;
-}
-
-interface TaskFormProps {
-  open: boolean;
-  onClose: () => void;
-  onSubmit: (data: TaskFormData) => void;
-  submitting?: boolean;
-  error?: string | null;
-}
+export interface TaskFormData { title: string; description?: string; priority: TaskPriority; dueDate?: string; reminderAt?: string; tags: string[]; dependencies: string[]; contextTriggers: ContextTrigger[]; delegatedTo?: string; delegatedPhone?: string; }
+interface TaskFormProps { open: boolean; onClose: () => void; onSubmit: (data: TaskFormData) => void; submitting?: boolean; error?: string | null; }
+function emptyTrigger(): ContextTrigger { return { type: "time", value: "" }; }
 
 export function TaskForm({ open, onClose, onSubmit, submitting = false, error }: TaskFormProps) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<TaskPriority>("medium");
-  const [dueDate, setDueDate] = useState("");
-  const [reminderAt, setReminderAt] = useState("");
-  const [tags, setTags] = useState("");
-  const [delegatedTo, setDelegatedTo] = useState("");
-  const [dependencies, setDependencies] = useState("");
-  const [triggerType, setTriggerType] = useState<ContextTrigger["type"]>("time");
-  const [triggerValue, setTriggerValue] = useState("");
-  const [triggerLatitude, setTriggerLatitude] = useState("");
-  const [triggerLongitude, setTriggerLongitude] = useState("");
-  const [triggerRecurrence, setTriggerRecurrence] = useState<ContextRecurrence | "">("");
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const normalizedTitle = title.trim();
-    if (!normalizedTitle || submitting) return;
-
-    onSubmit({
-      title: normalizedTitle,
-      description: description.trim() || undefined,
-      priority,
-      dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
-      reminderAt: reminderAt ? new Date(reminderAt).toISOString() : undefined,
-      tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
-      dependencies: dependencies.split(",").map((id) => id.trim()).filter(Boolean),
-      contextTriggers: triggerValue.trim() ? [{ type: triggerType, value: triggerValue.trim(), ...(triggerType === "time" && triggerRecurrence ? { recurrence: triggerRecurrence } : {}), ...(triggerType === "location" || triggerType === "weather" ? { latitude: Number(triggerLatitude), longitude: Number(triggerLongitude) } : {}) }] : [],
-      delegatedTo: delegatedTo.trim() || undefined,
-    });
-  }
-
-  return (
-    <Modal open={open} onClose={submitting ? () => undefined : onClose} title="New Task">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus className="border-slate-600 bg-slate-700 text-slate-100" />
-        <div>
-          <label htmlFor="task-description" className="mb-2 block text-sm font-medium text-slate-300">Description</label>
-          <textarea id="task-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20" />
-        </div>
-        <div>
-          <label htmlFor="task-priority" className="mb-2 block text-sm font-medium text-slate-300">Priority</label>
-          <select id="task-priority" value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100">
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="task-due-date" className="mb-2 block text-sm font-medium text-slate-300">Due date</label>
-            <input id="task-due-date" type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20" />
-          </div>
-          <div>
-            <label htmlFor="task-reminder-at" className="mb-2 block text-sm font-medium text-slate-300">Reminder time</label>
-            <input id="task-reminder-at" type="datetime-local" value={reminderAt} onChange={(e) => setReminderAt(e.target.value)} min={new Date().toISOString().slice(0, 16)} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20" />
-          </div>
-        </div>
-        <Input label="Tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="work, important, voice" className="border-slate-600 bg-slate-700 text-slate-100" />
-        <Input label="Dependency IDs (comma separated)" value={dependencies} onChange={(e) => setDependencies(e.target.value)} placeholder="MongoDB task IDs" className="border-slate-600 bg-slate-700 text-slate-100" />
-        <div className="rounded-lg border border-slate-700 p-3">
-          <p className="mb-2 text-sm font-medium text-slate-300">Context trigger (optional)</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <select aria-label="Context trigger type" value={triggerType} onChange={(event) => { const nextType = event.target.value as ContextTrigger["type"]; setTriggerType(nextType); if (nextType !== "time") setTriggerRecurrence(""); }} className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-slate-100">
-              <option value="time">Time</option><option value="location">Location</option><option value="weather">Weather</option><option value="calendar">Calendar keyword</option>
-            </select>
-            <Input label="Value" value={triggerValue} onChange={(event) => setTriggerValue(event.target.value)} placeholder={triggerType === "time" ? "2026-09-01T09:00:00.000Z" : triggerType === "weather" ? "rain" : "office"} className="border-slate-600 bg-slate-700 text-slate-100" />
-          </div>
-          {triggerType === "time" ? <div className="mt-3"><label htmlFor="context-trigger-recurrence" className="mb-2 block text-sm font-medium text-slate-300">Repeat</label><select id="context-trigger-recurrence" value={triggerRecurrence} onChange={(event) => setTriggerRecurrence(event.target.value as ContextRecurrence | "")} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-slate-100"><option value="">Once</option><option value="hourly">Hourly</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select></div> : null}
-          {triggerType === "location" || triggerType === "weather" ? <div className="mt-3 grid gap-3 sm:grid-cols-2"><Input label="Latitude" type="number" value={triggerLatitude} onChange={(event) => setTriggerLatitude(event.target.value)} className="border-slate-600 bg-slate-700 text-slate-100" /><Input label="Longitude" type="number" value={triggerLongitude} onChange={(event) => setTriggerLongitude(event.target.value)} className="border-slate-600 bg-slate-700 text-slate-100" /></div> : null}
-        </div>
-        <Input label="Delegate to (email)" type="email" value={delegatedTo} onChange={(e) => setDelegatedTo(e.target.value)} placeholder="teammate@example.com" className="border-slate-600 bg-slate-700 text-slate-100" />
-        {error ? <p className="text-sm text-red-400" role="alert">{error}</p> : null}
-        <div className="flex gap-2 pt-2">
-          <Button type="submit" className="flex-1" loading={submitting}>Create Task</Button>
-          <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
-        </div>
-      </form>
-    </Modal>
-  );
+  const [title, setTitle] = useState(""); const [description, setDescription] = useState(""); const [priority, setPriority] = useState<TaskPriority>("medium"); const [dueDate, setDueDate] = useState(""); const [reminderAt, setReminderAt] = useState(""); const [tags, setTags] = useState(""); const [delegatedTo, setDelegatedTo] = useState(""); const [delegatedPhone, setDelegatedPhone] = useState(""); const [dependencies, setDependencies] = useState(""); const [contextTriggers, setContextTriggers] = useState<ContextTrigger[]>([]);
+  function updateTrigger(index: number, updates: Partial<ContextTrigger>) { setContextTriggers((current) => current.map((trigger, currentIndex) => currentIndex === index ? { ...trigger, ...updates } : trigger)); }
+  function handleSubmit(e: React.FormEvent) { e.preventDefault(); const normalizedTitle = title.trim(); if (!normalizedTitle || submitting) return; const triggers = contextTriggers.filter((trigger) => trigger.value.trim()).map((trigger) => ({ ...trigger, value: trigger.value.trim() })); onSubmit({ title: normalizedTitle, description: description.trim() || undefined, priority, dueDate: dueDate ? new Date(dueDate).toISOString() : undefined, reminderAt: reminderAt ? new Date(reminderAt).toISOString() : undefined, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean), dependencies: dependencies.split(",").map((id) => id.trim()).filter(Boolean), contextTriggers: triggers, delegatedTo: delegatedTo.trim() || undefined, delegatedPhone: delegatedPhone.trim() || undefined }); }
+  return <Modal open={open} onClose={submitting ? () => undefined : onClose} title="New Task"><form onSubmit={handleSubmit} className="space-y-4"><Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus className="border-slate-600 bg-slate-700 text-slate-100" /><div><label htmlFor="task-description" className="mb-2 block text-sm font-medium text-slate-300">Description</label><textarea id="task-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100" /></div><div><label htmlFor="task-priority" className="mb-2 block text-sm font-medium text-slate-300">Priority</label><select id="task-priority" value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div><div className="grid gap-4 sm:grid-cols-2"><div><label htmlFor="task-due-date" className="mb-2 block text-sm font-medium text-slate-300">Due date</label><input id="task-due-date" type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100" /></div><div><label htmlFor="task-reminder-at" className="mb-2 block text-sm font-medium text-slate-300">Reminder time</label><input id="task-reminder-at" type="datetime-local" value={reminderAt} onChange={(e) => setReminderAt(e.target.value)} min={new Date().toISOString().slice(0, 16)} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100" /></div></div><Input label="Tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="work, important, voice" className="border-slate-600 bg-slate-700 text-slate-100" /><Input label="Dependency IDs (comma separated)" value={dependencies} onChange={(e) => setDependencies(e.target.value)} placeholder="MongoDB task IDs" className="border-slate-600 bg-slate-700 text-slate-100" /><fieldset className="rounded-lg border border-slate-700 p-3"><div className="flex items-center justify-between"><legend className="text-sm font-medium text-slate-300">Context triggers</legend><Button type="button" size="sm" variant="secondary" onClick={() => setContextTriggers((current) => current.length < 20 ? [...current, emptyTrigger()] : current)} disabled={contextTriggers.length >= 20}><Plus className="h-4 w-4" />Add trigger</Button></div><div className="mt-3 space-y-3">{contextTriggers.map((trigger, index) => <div key={index} className="rounded-lg border border-slate-700/60 p-3"><div className="flex gap-2"><select aria-label={`Context trigger ${index + 1} type`} value={trigger.type} onChange={(event) => updateTrigger(index, { type: event.target.value as ContextTrigger["type"], recurrence: event.target.value === "time" ? trigger.recurrence : undefined })} className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-slate-100"><option value="time">Time</option><option value="location">Location</option><option value="weather">Weather</option><option value="calendar">Calendar keyword</option><option value="keyword">Keyword</option></select><button type="button" onClick={() => setContextTriggers((current) => current.filter((_, currentIndex) => currentIndex !== index))} aria-label={`Remove context trigger ${index + 1}`} className="rounded-lg p-2 text-slate-500 hover:text-red-400"><Trash2 className="h-4 w-4" /></button></div><Input label="Value" type={trigger.type === "time" ? "datetime-local" : "text"} value={trigger.value} onChange={(event) => updateTrigger(index, { value: event.target.value })} placeholder={trigger.type === "time" ? "Choose date and time" : "office, rain, meeting"} className="mt-2 border-slate-600 bg-slate-700 text-slate-100" />{trigger.type === "time" ? <select aria-label={`Context trigger ${index + 1} recurrence`} value={trigger.recurrence ?? ""} onChange={(event) => updateTrigger(index, { recurrence: event.target.value ? event.target.value as ContextRecurrence : undefined })} className="mt-2 w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-slate-100"><option value="">Once</option><option value="hourly">Hourly</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select> : null}{trigger.type === "location" || trigger.type === "weather" ? <div className="mt-2 grid gap-2 sm:grid-cols-2"><Input label="Latitude" type="number" value={trigger.latitude?.toString() ?? ""} onChange={(event) => updateTrigger(index, { latitude: Number(event.target.value) })} className="border-slate-600 bg-slate-700 text-slate-100" /><Input label="Longitude" type="number" value={trigger.longitude?.toString() ?? ""} onChange={(event) => updateTrigger(index, { longitude: Number(event.target.value) })} className="border-slate-600 bg-slate-700 text-slate-100" /></div> : null}</div>)}</div></fieldset><div className="grid gap-4 sm:grid-cols-2"><Input label="Delegate to (email)" type="email" value={delegatedTo} onChange={(e) => setDelegatedTo(e.target.value)} placeholder="teammate@example.com" className="border-slate-600 bg-slate-700 text-slate-100" /><Input label="Delegate phone (E.164)" type="tel" value={delegatedPhone} onChange={(e) => setDelegatedPhone(e.target.value)} placeholder="+15551234567" className="border-slate-600 bg-slate-700 text-slate-100" /></div>{error ? <p className="text-sm text-red-400" role="alert">{error}</p> : null}<div className="flex gap-2 pt-2"><Button type="submit" className="flex-1" loading={submitting}>Create Task</Button><Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button></div></form></Modal>;
 }

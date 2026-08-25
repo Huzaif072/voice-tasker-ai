@@ -194,6 +194,7 @@ export default function DashboardPage() {
               dependencies: data.dependencies,
               contextTriggers: data.contextTriggers,
               delegatedTo: data.delegatedTo,
+              delegatedPhone: data.delegatedPhone,
             },
             { onSuccess: () => setShowForm(false) }
           );

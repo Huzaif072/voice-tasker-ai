@@ -8,6 +8,7 @@ import {
   CheckSquare,
   Volume2,
   BarChart3,
+  Activity,
   Settings,
   LogOut,
   X,
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/dashboard/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/dashboard/voice", label: "Voice", icon: Volume2 },
   { href: "/dashboard/summary", label: "Summary", icon: BarChart3 },
+  { href: "/dashboard/analytics", label: "Analytics", icon: Activity },
   { href: "/dashboard/security", label: "Security", icon: Settings },
 ];
 

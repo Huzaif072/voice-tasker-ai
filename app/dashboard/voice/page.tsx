@@ -14,6 +14,7 @@ import type { RootState } from "@/store";
 import { setParsedIntent } from "@/store/slices/voiceSlice";
 import { VoiceCommandHistory } from "@/components/voice/VoiceCommandHistory";
 import { useVoiceHistory } from "@/hooks/useVoiceHistory";
+import { FeedbackButtons } from "@/components/ai/FeedbackButtons";
 
 export default function VoicePage() {
   const dispatch = useDispatch();
@@ -44,6 +45,7 @@ export default function VoicePage() {
       {parsedIntent ? <VoiceIntentPreview intent={parsedIntent} onDismiss={dismissPreview} onConfirm={confirmLastCommand} onSelectTask={(title) => setTextInput(`${parsedIntent.action} ${title}`)} /> : null}
       {calendarLink ? <a href={calendarLink} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 text-center text-sm text-violet-200 hover:bg-violet-500/20">Open calendar link</a> : null}
       {followUpPrompts.length ? <section aria-labelledby="voice-followups-heading" className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-4"><h3 id="voice-followups-heading" className="text-sm font-semibold text-slate-300">Continue the conversation</h3><div className="mt-3 flex flex-wrap gap-2">{followUpPrompts.map((prompt) => <Button key={prompt} type="button" size="sm" variant="ghost" onClick={() => submitText(prompt)} disabled={isProcessing}>{prompt}</Button>)}</div></section> : null}
+      {conversationId ? <div className="flex justify-end"><FeedbackButtons category="voice" conversationId={conversationId} /></div> : null}
       {error ? <p className="text-center text-sm text-red-400" role="alert" aria-live="assertive">{error}</p> : null}
       {queryResults.length ? <section aria-labelledby="voice-results-heading" className="space-y-3"><h3 id="voice-results-heading" className="text-sm font-semibold text-slate-300">Matching tasks</h3>{queryResults.map((task) => <div key={task._id} className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 py-2 text-sm"><span className="text-slate-200">{task.title}</span><span className="capitalize text-slate-400">{task.status} · {task.priority}</span></div>)}</section> : null}
       <p className="sr-only" aria-live="polite">{isRecording ? "Listening" : isProcessing ? "Processing voice command" : ""}</p>
