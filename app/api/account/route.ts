@@ -6,6 +6,7 @@ import { getUsersCollection } from "@/lib/db/models/User";
 import { getTasksCollection } from "@/lib/db/models/Task";
 import { getNotificationsCollection } from "@/lib/db/models/Notification";
 import { getVoiceSessionsCollection } from "@/lib/db/models/VoiceSession";
+import { getReminderDeliveriesCollection } from "@/lib/db/models/ReminderDelivery";
 import { invalidateCache } from "@/lib/redis/ratelimit";
 import { accountDeleteSchema } from "@/lib/validators/account";
 
@@ -16,17 +17,19 @@ function isTransactionUnsupported(error: unknown): boolean {
 }
 
 async function deleteAccountData(db: Db, userId: ObjectId, ownerId: string, session?: ClientSession) {
-  const [users, tasks, notifications, sessions] = await Promise.all([
+  const [users, tasks, notifications, sessions, deliveries] = await Promise.all([
     getUsersCollection(db),
     getTasksCollection(db),
     getNotificationsCollection(db),
     getVoiceSessionsCollection(db),
+    getReminderDeliveriesCollection(db),
   ]);
   const options = session ? { session } : undefined;
 
   await tasks.deleteMany({ createdBy: ownerId }, options);
   await notifications.deleteMany({ userId: ownerId }, options);
   await sessions.deleteMany({ userId: ownerId }, options);
+  await deliveries.deleteMany({ userId: ownerId }, options);
   const deleted = await users.deleteOne({ _id: userId }, options);
   if (deleted.deletedCount === 0) throw new Error("ACCOUNT_NOT_FOUND");
 }

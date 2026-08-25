@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { TaskList } from "@/components/dashboard/TaskList";
 import { TaskFilters, type TaskFilter } from "@/components/dashboard/TaskFilters";
@@ -25,6 +25,26 @@ export default function TasksPage() {
   const tasks = taskPageQuery.data?.tasks ?? [];
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+
+  useEffect(() => {
+    const taskId = new URLSearchParams(window.location.search).get("task");
+    if (!taskId) return;
+    const controller = new AbortController();
+    fetch(`/api/tasks/${encodeURIComponent(taskId)}`, { signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "Unable to load task");
+        return data.task as Task;
+      })
+      .then((task) => {
+        setEditingTask(task);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("Task deep-link error:", error);
+      });
+    return () => controller.abort();
+  }, []);
 
   function changeFilter(nextFilter: TaskFilter) {
     setFilter(nextFilter);

@@ -2,15 +2,21 @@ import { ObjectId, type Db } from "mongodb";
 import { getTasksCollection } from "@/lib/db/models/Task";
 import { getNotificationsCollection } from "@/lib/db/models/Notification";
 import { getUsersCollection, defaultReminderSettings, type UserDocument } from "@/lib/db/models/User";
+import { getReminderDeliveriesCollection, type ReminderDeliveryDocument } from "@/lib/db/models/ReminderDelivery";
 import { sendEmail } from "@/lib/notifications/email";
 import { sendPushNotification } from "@/lib/notifications/push";
 
 const MAX_REMINDERS_PER_RUN = 100;
+const MAX_DELIVERIES_PER_RUN = 100;
+const MAX_DELIVERY_ATTEMPTS = 5;
+const DELIVERY_LEASE_MS = 2 * 60 * 1000;
 
 export interface ReminderRunResult {
   scanned: number;
   created: number;
-  deliveriesAttempted: number;
+  deliveriesClaimed: number;
+  deliveriesSent: number;
+  deliveriesFailed: number;
 }
 
 function escapeHtml(value: string): string {
@@ -27,10 +33,96 @@ function userObjectId(userId: string): ObjectId | undefined {
   return ObjectId.isValid(userId) ? new ObjectId(userId) : undefined;
 }
 
+function retryAt(now: Date, attempts: number): string {
+  const delayMs = Math.min(60 * 60 * 1000, 60 * 1000 * (2 ** Math.max(0, attempts - 1)));
+  return new Date(now.getTime() + delayMs).toISOString();
+}
+
+async function queueDelivery(
+  deliveries: Awaited<ReturnType<typeof getReminderDeliveriesCollection>>,
+  task: { _id?: ObjectId; createdBy: string; title: string },
+  reminderKey: string,
+  channel: "email" | "push",
+  now: Date,
+) {
+  if (!task._id) return;
+  try {
+    await deliveries.updateOne(
+      { reminderKey, channel },
+      {
+        $setOnInsert: {
+          reminderKey,
+          userId: task.createdBy,
+          taskId: task._id.toString(),
+          taskTitle: task.title,
+          channel,
+          status: "pending",
+          attempts: 0,
+          nextAttemptAt: now.toISOString(),
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        },
+      },
+      { upsert: true },
+    );
+  } catch (error) {
+    if ((error as { code?: number }).code !== 11000) throw error;
+  }
+}
+
+async function claimDelivery(
+  deliveries: Awaited<ReturnType<typeof getReminderDeliveriesCollection>>,
+  now: Date,
+): Promise<ReminderDeliveryDocument | null> {
+  const nowIso = now.toISOString();
+  const result = await deliveries.findOneAndUpdate(
+    {
+      attempts: { $lt: MAX_DELIVERY_ATTEMPTS },
+      $or: [
+        { status: "pending", nextAttemptAt: { $lte: nowIso } },
+        { status: "sending", leaseUntil: { $lte: nowIso } },
+      ],
+    },
+    {
+      $set: {
+        status: "sending",
+        leaseUntil: new Date(now.getTime() + DELIVERY_LEASE_MS).toISOString(),
+        updatedAt: nowIso,
+      },
+      $inc: { attempts: 1 },
+    },
+    { sort: { nextAttemptAt: 1 }, returnDocument: "after" },
+  );
+  return result;
+}
+
+async function deliver(
+  delivery: ReminderDeliveryDocument,
+  user: UserDocument | undefined,
+): Promise<boolean> {
+  if (!user) return false;
+  if (delivery.channel === "email" && user.email) {
+    return sendEmail({
+      to: user.email,
+      subject: `Reminder: ${delivery.taskTitle}`,
+      html: `<p>You asked to be reminded about <strong>${escapeHtml(delivery.taskTitle)}</strong>.</p>`,
+    });
+  }
+  if (delivery.channel === "push" && user.pushSubscription) {
+    return sendPushNotification(user.pushSubscription, {
+      title: "Task reminder",
+      body: delivery.taskTitle,
+      url: `/dashboard/tasks?task=${delivery.taskId}`,
+    });
+  }
+  return false;
+}
+
 export async function processDueReminders(db: Db, now = new Date()): Promise<ReminderRunResult> {
   const tasks = await getTasksCollection(db);
   const notifications = await getNotificationsCollection(db);
   const users = await getUsersCollection(db);
+  const deliveries = await getReminderDeliveriesCollection(db);
   const dueTasks = await tasks.find({
     reminderAt: { $type: "string", $lte: now.toISOString() },
     status: { $nin: ["completed", "cancelled"] },
@@ -44,15 +136,14 @@ export async function processDueReminders(db: Db, now = new Date()): Promise<Rem
   const userById = new Map(userRows.map((user) => [user._id?.toString(), user]));
 
   let created = 0;
-  let deliveriesAttempted = 0;
   for (const task of dueTasks) {
     if (!task._id || !task.reminderAt || !task.createdBy) continue;
     const user = userById.get(task.createdBy) as UserDocument | undefined;
-    const settings = user?.reminderSettings ?? defaultReminderSettings;
+    if (!user) continue;
+    const settings = user.reminderSettings ?? defaultReminderSettings;
     if (!settings.enabled) continue;
 
     const reminderKey = `${task._id.toString()}:${task.reminderAt}`;
-    let inserted = false;
     if (settings.channels.includes("in_app")) {
       try {
         await notifications.insertOne({
@@ -65,33 +156,51 @@ export async function processDueReminders(db: Db, now = new Date()): Promise<Rem
           reminderKey,
           createdAt: now.toISOString(),
         });
-        inserted = true;
         created += 1;
       } catch (error) {
         if ((error as { code?: number }).code !== 11000) throw error;
       }
     }
-
-    if (!inserted) continue;
-    const safeTitle = escapeHtml(task.title);
-    const deliveryPromises: Promise<boolean>[] = [];
-    if (settings.channels.includes("email") && user?.email) {
-      deliveryPromises.push(sendEmail({
-        to: user.email,
-        subject: `Reminder: ${task.title}`,
-        html: `<p>You asked to be reminded about <strong>${safeTitle}</strong>.</p>`,
-      }));
-    }
-    if (settings.channels.includes("push") && user?.pushSubscription) {
-      deliveryPromises.push(sendPushNotification(user.pushSubscription, {
-        title: "Task reminder",
-        body: task.title,
-        url: `/dashboard/tasks?task=${task._id.toString()}`,
-      }));
-    }
-    deliveriesAttempted += deliveryPromises.length;
-    if (deliveryPromises.length) await Promise.all(deliveryPromises);
+    if (settings.channels.includes("email") && user.email) await queueDelivery(deliveries, task, reminderKey, "email", now);
+    if (settings.channels.includes("push") && user.pushSubscription) await queueDelivery(deliveries, task, reminderKey, "push", now);
   }
 
-  return { scanned: dueTasks.length, created, deliveriesAttempted };
+  let deliveriesClaimed = 0;
+  let deliveriesSent = 0;
+  let deliveriesFailed = 0;
+  for (let index = 0; index < MAX_DELIVERIES_PER_RUN; index += 1) {
+    const delivery = await claimDelivery(deliveries, now);
+    if (!delivery) break;
+    deliveriesClaimed += 1;
+    let deliveryUser = userById.get(delivery.userId) as UserDocument | undefined;
+    if (!deliveryUser) {
+      const id = userObjectId(delivery.userId);
+      if (id) {
+        const fetchedUser = await users.findOne({ _id: id }, { projection: { email: 1, pushSubscription: 1 } });
+        if (fetchedUser) deliveryUser = fetchedUser;
+      }
+    }
+    const sent = await deliver(delivery, deliveryUser);
+    const updatedAt = now.toISOString();
+    if (sent) {
+      deliveriesSent += 1;
+      await deliveries.updateOne(
+        { _id: delivery._id, status: "sending" },
+        { $set: { status: "sent", updatedAt }, $unset: { leaseUntil: "", lastError: "" } },
+      );
+    } else if (delivery.attempts >= MAX_DELIVERY_ATTEMPTS) {
+      deliveriesFailed += 1;
+      await deliveries.updateOne(
+        { _id: delivery._id, status: "sending" },
+        { $set: { status: "failed", lastError: "Delivery provider rejected the notification", updatedAt }, $unset: { leaseUntil: "" } },
+      );
+    } else {
+      await deliveries.updateOne(
+        { _id: delivery._id, status: "sending" },
+        { $set: { status: "pending", nextAttemptAt: retryAt(now, delivery.attempts), lastError: "Delivery provider rejected the notification", updatedAt }, $unset: { leaseUntil: "" } },
+      );
+    }
+  }
+
+  return { scanned: dueTasks.length, created, deliveriesClaimed, deliveriesSent, deliveriesFailed };
 }

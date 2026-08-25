@@ -14,6 +14,7 @@ function hasValidSecret(request: Request): boolean {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   if (!hasValidSecret(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -21,9 +22,11 @@ export async function POST(request: Request) {
   try {
     const db = await connectWithRetry();
     const result = await processDueReminders(db);
-    return NextResponse.json({ ok: true, ...result });
-  } catch (error) {
-    console.error("Reminder worker error:", error);
+    const durationMs = Date.now() - startedAt;
+    console.info(JSON.stringify({ scope: "reminder_worker", event: "run_completed", ...result, durationMs, timestamp: new Date().toISOString() }));
+    return NextResponse.json({ ok: true, ...result, durationMs });
+  } catch {
+    console.error(JSON.stringify({ scope: "reminder_worker", event: "run_failed", durationMs: Date.now() - startedAt, timestamp: new Date().toISOString() }));
     return NextResponse.json({ error: "Reminder processing failed" }, { status: 503 });
   }
 }

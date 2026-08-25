@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 type Provider = { provider: string; linkedAt: string };
 type ReminderChannel = "in_app" | "email" | "push";
@@ -10,6 +11,7 @@ type ReminderSettings = { enabled: boolean; channels: ReminderChannel[] };
 
 export default function SecurityPage() {
   const { logout } = useAuth();
+  const { status: pushStatus, error: pushError, subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [hasPassword, setHasPassword] = useState(false);
   const [message, setMessage] = useState("");
@@ -171,6 +173,16 @@ export default function SecurityPage() {
           ))}
         </div>
         <Button className="mt-4" onClick={saveReminderSettings} loading={savingReminders}>Save reminder settings</Button>
+      </section>
+      <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
+        <h2 className="text-lg font-semibold text-slate-100">Browser push notifications</h2>
+        <p className="mt-2 text-sm text-slate-400">Allow this browser to receive task reminders even when the dashboard is not open.</p>
+        {pushStatus === "unconfigured" ? <p className="mt-3 text-sm text-slate-500">Push delivery requires VAPID settings on the server.</p> : null}
+        {pushStatus === "denied" ? <p className="mt-3 text-sm text-amber-300">Browser notification permission is blocked. Enable it in the browser site settings.</p> : null}
+        {pushError ? <p className="mt-3 text-sm text-rose-300" role="alert">{pushError}</p> : null}
+        <Button className="mt-4" onClick={pushStatus === "subscribed" ? unsubscribePush : subscribePush} loading={pushStatus === "loading"} disabled={pushStatus === "unsupported" || pushStatus === "unconfigured" || pushStatus === "denied"}>
+          {pushStatus === "subscribed" ? "Disable browser push" : "Enable browser push"}
+        </Button>
       </section>
       <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
         <h2 className="text-lg font-semibold text-slate-100">Your data</h2>

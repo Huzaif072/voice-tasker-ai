@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { ObjectId } from "mongodb";
 import type { UserDocument } from "../lib/db/models/User";
 import { sanitizeUserForExport } from "../lib/account/export";
-import { reminderSettingsSchema } from "../lib/validators/account";
+import { pushSubscriptionSchema, reminderSettingsSchema } from "../lib/validators/account";
 
 const user = {
   _id: new ObjectId("507f1f77bcf86cd799439011"),
@@ -35,6 +35,9 @@ for (const forbidden of ["password", "providerId", "linkedProviders", "pushSubsc
 }
 
 assert.equal(reminderSettingsSchema.safeParse({ enabled: true, channels: ["in_app", "email", "push"] }).success, true);
+assert.equal(pushSubscriptionSchema.safeParse({ endpoint: "https://push.example/subscription", keys: { p256dh: "p".repeat(32), auth: "a".repeat(16) } }).success, true);
+assert.equal(pushSubscriptionSchema.safeParse({ endpoint: "not-a-url", keys: { p256dh: "short", auth: "short" } }).success, false);
+assert.equal(pushSubscriptionSchema.safeParse({ endpoint: "https://push.example/subscription", keys: { p256dh: "p".repeat(32), auth: "a".repeat(16), secret: "unexpected" } }).success, false);
 assert.equal(reminderSettingsSchema.safeParse({ enabled: true, channels: ["email"] }).success, false);
 assert.equal(reminderSettingsSchema.safeParse({ enabled: true, channels: ["fax"] }).success, false);
 console.log("PASS: account export allowlisting and reminder preference contracts are covered.");

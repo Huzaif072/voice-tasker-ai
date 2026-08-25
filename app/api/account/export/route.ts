@@ -6,6 +6,7 @@ import { getUsersCollection } from "@/lib/db/models/User";
 import { getTasksCollection } from "@/lib/db/models/Task";
 import { getNotificationsCollection } from "@/lib/db/models/Notification";
 import { getVoiceSessionsCollection } from "@/lib/db/models/VoiceSession";
+import { getReminderDeliveriesCollection } from "@/lib/db/models/ReminderDelivery";
 import { sanitizeUserForExport } from "@/lib/account/export";
 
 function serialize<T extends { _id?: ObjectId }>(value: T) {
@@ -23,11 +24,12 @@ export async function GET(request: Request) {
   try {
     const db = await connectWithRetry();
     const userId = new ObjectId(auth.user.id);
-    const [user, tasks, notifications, sessions] = await Promise.all([
+    const [user, tasks, notifications, sessions, reminderDeliveries] = await Promise.all([
       getUsersCollection(db).then((collection) => collection.findOne({ _id: userId })),
       getTasksCollection(db).then((collection) => collection.find({ createdBy: auth.user.id }).toArray()),
       getNotificationsCollection(db).then((collection) => collection.find({ userId: auth.user.id }).toArray()),
       getVoiceSessionsCollection(db).then((collection) => collection.find({ userId: auth.user.id }).toArray()),
+      getReminderDeliveriesCollection(db).then((collection) => collection.find({ userId: auth.user.id }).toArray()),
     ]);
 
     if (!user) return NextResponse.json({ error: "Account not found" }, { status: 404 });
@@ -38,6 +40,7 @@ export async function GET(request: Request) {
       tasks: tasks.map(serialize),
       notifications: notifications.map(serialize),
       voiceSessions: sessions.map(serialize),
+      reminderDeliveries: reminderDeliveries.map(serialize),
     };
 
     return new Response(JSON.stringify(payload, null, 2), {

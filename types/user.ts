@@ -35,6 +35,7 @@ export interface User {
   disabledAt?: string;
   voiceSettings: VoiceSettings;
   pushSubscription?: unknown;
+  pushSubscriptionUpdatedAt?: string;
   reminderSettings?: ReminderSettings;
   createdAt: string;
 }
