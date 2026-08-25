@@ -7,31 +7,45 @@ import { getCached, setCache, invalidateCache } from "@/lib/redis/ratelimit";
 import { rateLimit } from "@/lib/redis/ratelimit";
 import type { Task } from "@/types/task";
 import { normalizeTask } from "@/lib/tasks/normalize";
+import { buildTaskFilter, taskCacheKey, taskQuerySchema } from "@/lib/tasks/query";
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
 
   const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status");
-  const cacheKey = `tasks:${auth.user.id}:${status ?? "all"}`;
+  const parsedQuery = taskQuerySchema.safeParse(Object.fromEntries(searchParams.entries()));
+  if (!parsedQuery.success) {
+    return NextResponse.json({ error: parsedQuery.error.issues[0]?.message ?? "Invalid task query" }, { status: 400 });
+  }
+  const query = parsedQuery.data;
+  const cacheKey = taskCacheKey(auth.user.id, query);
 
-  const cached = await getCached<Partial<Task>[]>(cacheKey);
-  if (cached) return NextResponse.json({ tasks: cached.map(normalizeTask) });
+  const cached = await getCached<{ tasks: Partial<Task>[]; page: number; limit: number; total: number; hasMore: boolean }>(cacheKey);
+  if (cached) return NextResponse.json({ ...cached, tasks: cached.tasks.map(normalizeTask) });
 
   try {
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
-    const filter: Record<string, unknown> = { createdBy: auth.user.id };
-    if (status) filter.status = status;
-
-    const results = await tasks.find(filter).sort({ createdAt: -1 }).limit(100).toArray();
+    const filter = buildTaskFilter(auth.user.id, query);
+    const skip = (query.page - 1) * query.limit;
+    const [results, total] = await Promise.all([
+      tasks.find(filter).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(query.limit).toArray(),
+      tasks.countDocuments(filter),
+    ]);
     const serialized = results.map((t) =>
       normalizeTask({ ...t, _id: t._id?.toString() } as Partial<Task>)
     );
+    const response = {
+      tasks: serialized,
+      page: query.page,
+      limit: query.limit,
+      total,
+      hasMore: skip + serialized.length < total,
+    };
 
-    await setCache(cacheKey, serialized);
-    return NextResponse.json({ tasks: serialized });
+    await setCache(cacheKey, response);
+    return NextResponse.json(response);
   } catch {
     return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   }

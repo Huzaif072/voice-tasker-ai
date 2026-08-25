@@ -1,5 +1,6 @@
 import { normalizeTask } from "../lib/tasks/normalize.ts";
 import { taskUpdateSchema } from "../lib/validators/task.ts";
+import { buildTaskFilter, taskQuerySchema } from "../lib/tasks/query.ts";
 
 const legacyTask = normalizeTask({
   _id: "legacy-task",
@@ -50,4 +51,13 @@ const editableTask = taskUpdateSchema.safeParse({
 });
 if (!editableTask.success) throw new Error("Task detail edits should accept supported metadata and subtasks");
 
-console.log("PASS: legacy and malformed task records normalize safely; editable task payloads validate.");
+const parsedQuery = taskQuerySchema.safeParse({ page: "2", limit: "25", search: "quarterly", active: "false" });
+if (!parsedQuery.success || parsedQuery.data.page !== 2 || parsedQuery.data.limit !== 25 || parsedQuery.data.active) {
+  throw new Error("Task query parameters should parse bounded pagination and false boolean values correctly");
+}
+const queryFilter = buildTaskFilter("user-1", parsedQuery.data);
+if (queryFilter.createdBy !== "user-1" || !queryFilter.$text || queryFilter.$text.$search !== "quarterly") {
+  throw new Error("Task search filters must remain user-scoped and use the text-search contract");
+}
+
+console.log("PASS: legacy and malformed task records normalize safely; editable task payloads and query contracts validate.");

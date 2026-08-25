@@ -14,6 +14,7 @@ export async function getTasksCollection(db: Db): Promise<Collection<TaskDocumen
       col.createIndex({ priority: 1 }),
       col.createIndex({ createdBy: 1, status: 1 }),
       col.createIndex({ createdBy: 1, dueDate: 1 }),
+      col.createIndex({ createdBy: 1, title: "text", description: "text", tags: "text" }),
     ]).then(() => undefined).catch((error) => { indexesPromise = null; throw error; });
   }
   await indexesPromise;
