@@ -21,7 +21,8 @@
     "test:e2e": "playwright test",
     "test:e2e:prod": "PLAYWRIGHT_PRODUCTION=true playwright test",
     "verify:indexes": "tsx scripts/verify-reminder-indexes.ts",
-    "test:all": "npm run test:auth && npm run test:voice && npm run test:tasks && npm run test:notifications && npm run test:delegation && npm run test:api && npm run test:account && npm run test:health && npm run test:routes && npm run test:reminders && npm run test:delivery"
+    "check:workflows": "tsx scripts/verify-workflow-actions.ts",
+    "test:all": "npm run check:workflows && npm run test:auth && npm run test:voice && npm run test:tasks && npm run test:notifications && npm run test:delegation && npm run test:api && npm run test:account && npm run test:health && npm run test:routes && npm run test:reminders && npm run test:delivery"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",

@@ -20,6 +20,7 @@ Run the complete local regression suite before opening a pull request:
 
 ```bash
 npm run test:all
+npm run check:workflows
 npm run lint
 npm run build
 npm audit --omit=dev
@@ -42,7 +43,7 @@ For a six-field UTC scheduler, a five-minute cadence is represented as `0 */5 * 
 
 ## Account controls
 
-The Security page can revoke all JWT sessions, download a sanitized JSON export, unlink configured OAuth providers, and permanently delete the account after explicit confirmation. Exports omit password hashes, reset and verification token material, and other authentication secrets. Account deletion removes user-owned tasks, notifications, voice sessions, and the user record; the endpoint clears the current session cookie after successful deletion.
+The Security page can revoke all JWT sessions, download a sanitized JSON export, unlink configured OAuth providers, and permanently delete the account after explicit confirmation. Exports omit password hashes, reset and verification token material, and other authentication secrets. Account exports are limited to one request per user per hour and reject any individual collection above 10,000 records before loading the export into memory. Account deletion removes user-owned tasks, notifications, voice sessions, and the user record; the endpoint clears the current session cookie after successful deletion.
 
 The current authentication design provides account-wide session invalidation through `sessionVersion`. It does not maintain a durable per-device session inventory, so the UI deliberately exposes account-wide logout rather than presenting unimplemented device-level controls. Account deletion uses a MongoDB transaction when supported and an idempotent collection-by-collection fallback for standalone deployments.
 
@@ -50,7 +51,7 @@ The current authentication design provides account-wide session invalidation thr
 
 `GET /api/health` performs a no-store MongoDB readiness check and returns HTTP 503 when the database is unavailable. The reminder callback is protected separately from normal user routes, emits redacted run metrics, and returns user-safe errors. Run `npm run verify:indexes` against a deployment after migrations to verify the unique, claim, owner, and TTL indexes without creating missing indexes. Keep application logs free of tokens, passwords, raw audio, and full export payloads. Browser tests start a local development server by default; set `PLAYWRIGHT_BASE_URL` to test a deployed environment instead.
 
-The optional Socket.IO client is disabled unless `NEXT_PUBLIC_SOCKET_ENABLED=true` and a reachable `NEXT_PUBLIC_SOCKET_URL` are configured. The local Whisper fallback requires the external binary and model paths documented in `.env.local.example`; the hosted transcription path remains the default when Groq is configured. Cache invalidation uses cursor-based Redis `SCAN` rather than blocking wildcard `KEYS`.
+The optional Socket.IO client is disabled unless `NEXT_PUBLIC_SOCKET_ENABLED=true` and a reachable `NEXT_PUBLIC_SOCKET_URL` are configured. The local Whisper fallback requires the external binary and model paths documented in `.env.local.example`; the hosted transcription path remains the default when Groq is configured. Cache invalidation uses cursor-based Redis `SCAN` rather than blocking wildcard `KEYS`. `npm run check:workflows` fails if a workflow introduces an unpinned external action; Dependabot checks pinned GitHub Actions weekly.
 
 ## Staging verification
 

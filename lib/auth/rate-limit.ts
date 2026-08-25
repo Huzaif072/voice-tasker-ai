@@ -13,6 +13,8 @@ const DELEGATION_WINDOW_SECONDS = 60;
 const DELEGATION_LIMIT = 10;
 const DELEGATION_TARGET_WINDOW_SECONDS = 60 * 60;
 const DELEGATION_TARGET_LIMIT = 3;
+const ACCOUNT_EXPORT_WINDOW_SECONDS = 60 * 60;
+const ACCOUNT_EXPORT_LIMIT = 1;
 
 function getClientAddress(request: Request) {
   const forwardedFor = request.headers.get("x-forwarded-for");
@@ -42,11 +44,16 @@ async function checkBuckets(
   };
 }
 
-export function getRetryAfterSeconds(scope: "login" | "password-reset" | "ai-decompose" | "delegation") {
+export function getRetryAfterSeconds(scope: "login" | "password-reset" | "ai-decompose" | "delegation" | "account-export") {
   if (scope === "login") return LOGIN_WINDOW_SECONDS;
   if (scope === "password-reset") return RESET_WINDOW_SECONDS;
   if (scope === "delegation") return DELEGATION_WINDOW_SECONDS;
+  if (scope === "account-export") return ACCOUNT_EXPORT_WINDOW_SECONDS;
   return AI_DECOMPOSE_WINDOW_SECONDS;
+}
+
+export async function checkAccountExportRateLimit(userId: string) {
+  return rateLimit(`account:export:${userId}`, ACCOUNT_EXPORT_LIMIT, ACCOUNT_EXPORT_WINDOW_SECONDS);
 }
 
 export async function checkAiDecomposeRateLimit(userId: string) {

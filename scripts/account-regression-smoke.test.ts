@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { ObjectId } from "mongodb";
 import type { UserDocument } from "../lib/db/models/User";
-import { sanitizeUserForExport } from "../lib/account/export";
+import { MAX_EXPORT_RECORDS, sanitizeUserForExport } from "../lib/account/export";
 import { pushSubscriptionSchema, reminderSettingsSchema } from "../lib/validators/account";
 
 const user = {
@@ -19,6 +19,9 @@ const user = {
   voiceSettings: { language: "en-US", speed: 1, enabled: true },
   createdAt: "2026-01-01T00:00:00.000Z",
 } as UserDocument;
+
+assert.equal(MAX_EXPORT_RECORDS, 10_000);
+assert.ok(MAX_EXPORT_RECORDS > 0);
 
 const exported = sanitizeUserForExport(user) as Record<string, unknown>;
 assert.deepEqual(exported, {
