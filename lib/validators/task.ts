@@ -33,6 +33,9 @@ const contextTriggerSchema = z.object({
   if (value.type === "weather" && (value.latitude === undefined || value.longitude === undefined)) {
     context.addIssue({ code: "custom", path: ["latitude"], message: "Weather triggers require coordinates" });
   }
+  if (value.type === "time" && !z.string().datetime().safeParse(value.value).success) {
+    context.addIssue({ code: "custom", path: ["value"], message: "Time triggers require an ISO timestamp" });
+  }
 });
 
 export const taskSchema = z.object({
