@@ -14,6 +14,7 @@ import { trackEvent } from "@/lib/analytics/events";
 import { buildCalendarComposeLink } from "@/lib/calendar/link";
 import { createAssignmentNotification, findAssignableUser } from "@/lib/tasks/assignments";
 import { recordRealtimeEvent } from "@/lib/realtime/events";
+import { getTaskInvitationsCollection } from "@/lib/db/models/TaskInvitation";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -165,6 +166,7 @@ export async function DELETE(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
     await cancelTaskDeliveries(db, id, auth.user.id);
+    await (await getTaskInvitationsCollection(db)).updateMany({ taskId: id, ownerId: auth.user.id, status: "pending" }, { $set: { status: "revoked" } });
     await recordRealtimeEvent(db, auth.user.id, "task_deleted", id);
     await trackEvent(db, auth.user.id, "task_deleted");
 

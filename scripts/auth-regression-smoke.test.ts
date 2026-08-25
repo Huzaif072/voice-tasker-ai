@@ -35,6 +35,7 @@ const normalized = signupSchema.safeParse({
   name: "  Ada Lovelace  ",
   email: " USER@EXAMPLE.COM ",
   password: "Password1",
+  acceptLegal: true,
 });
 if (!normalized.success || normalized.data.name !== "Ada Lovelace" || normalized.data.email !== "user@example.com") {
   throw new Error("Expected signup input to trim the name and normalize the email");

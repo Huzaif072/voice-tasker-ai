@@ -19,4 +19,5 @@ export interface Notification {
   action?: "assignment" | "reminder";
   actionLabel?: string;
   createdAt: string;
+  expiresAt?: string;
 }

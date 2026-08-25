@@ -9,6 +9,8 @@ import { delegationSchema } from "@/lib/validators/delegation";
 import { checkDelegationRateLimit, getRetryAfterSeconds } from "@/lib/auth/rate-limit";
 import { createAssignmentNotification, findAssignableUser } from "@/lib/tasks/assignments";
 import { recordRealtimeEvent } from "@/lib/realtime/events";
+import { buildInvitationUrl, createTaskInvitation } from "@/lib/tasks/invitations";
+import { getTaskInvitationsCollection } from "@/lib/db/models/TaskInvitation";
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
@@ -49,6 +51,15 @@ export async function POST(request: Request) {
 
     if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
     const recipient = await findAssignableUser(db, email);
+    let invitationUrl: string | undefined;
+    let invitationExpiresAt: Date | undefined;
+    if (!recipient && (email || phone)) {
+      const invitations = await getTaskInvitationsCollection(db);
+      await invitations.updateMany({ taskId, ownerId: auth.user.id, status: "pending" }, { $set: { status: "revoked" } });
+      const invitation = await createTaskInvitation(db, { taskId, ownerId: auth.user.id, recipientEmail: email?.toLowerCase(), recipientPhone: phone });
+      invitationUrl = buildInvitationUrl(invitation.token);
+      invitationExpiresAt = invitation.expiresAt;
+    }
 
     const updated = await tasks.updateOne(
       taskFilter,
@@ -56,7 +67,7 @@ export async function POST(request: Request) {
         $set: {
           ...(email ? { delegatedTo: email } : {}),
           ...(phone ? { delegatedPhone: phone } : {}),
-          ...(recipient?._id ? { assigneeUserId: recipient._id.toString(), assignmentStatus: "pending" as const } : { assignmentStatus: "none" as const }),
+          ...(recipient?._id ? { assigneeUserId: recipient._id.toString(), assignmentStatus: "pending" as const } : { assignmentStatus: invitationUrl ? "pending" as const : "none" as const }),
           delegationStatus: "pending",
           updatedAt: new Date().toISOString(),
         },
@@ -72,8 +83,8 @@ export async function POST(request: Request) {
       await recordRealtimeEvent(db, recipient._id.toString(), "assignment_changed", taskId);
     }
 
-    const emailSent = email ? await sendDelegationEmail(email, task.title, auth.user.name) : false;
-    const smsResult = phone ? await sendSms(phone, `${auth.user.name} delegated a task to you: ${task.title}`) : { sent: false, configured: false, permanent: false };
+    const emailSent = email ? await sendDelegationEmail(email, task.title, auth.user.name, invitationUrl) : false;
+    const smsResult = phone ? await sendSms(phone, `${auth.user.name} delegated a task to you: ${task.title}${invitationUrl ? ` Review it here: ${invitationUrl}` : ""}`) : { sent: false, configured: false, permanent: false };
     const delivered = emailSent || smsResult.sent;
     await tasks.updateOne(
       taskFilter,
@@ -84,7 +95,7 @@ export async function POST(request: Request) {
       success: true,
       pending: !delivered,
       channels: { email: emailSent, sms: smsResult.sent },
-      assignment: recipient?._id ? { status: "pending", recipientUserId: recipient._id.toString() } : null,
+      assignment: recipient?._id ? { status: "pending", recipientUserId: recipient._id.toString() } : invitationUrl ? { status: "invited", invitationUrl, expiresAt: invitationExpiresAt?.toISOString() } : null,
       message: delivered ? "Delegation delivered" : "Task saved as a failed delegation for retry",
     });
   } catch (error) {

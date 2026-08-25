@@ -5,6 +5,8 @@ import { getUsersCollection, defaultReminderSettings, type UserDocument } from "
 import { getReminderDeliveriesCollection, type ReminderDeliveryDocument } from "@/lib/db/models/ReminderDelivery";
 import { sendEmailResult } from "@/lib/notifications/email";
 import { sendPushNotificationResult } from "@/lib/notifications/push";
+import { encryptUserText } from "@/lib/privacy/fieldEncryption";
+import { notificationExpiresAt } from "@/lib/privacy/retention";
 
 const MAX_REMINDERS_PER_RUN = 100;
 const MAX_DELIVERIES_PER_RUN = 100;
@@ -154,11 +156,12 @@ export async function processDueReminders(db: Db, now = new Date()): Promise<Rem
           userId: task.createdBy,
           type: "task_reminder",
           title: "Task reminder",
-          message: task.title,
+          message: encryptUserText(task.title),
           read: false,
           taskId: task._id.toString(),
           reminderKey,
           createdAt: now.toISOString(),
+          expiresAt: notificationExpiresAt(),
         });
         created += 1;
       } catch (error) {

@@ -45,6 +45,8 @@ export function useVoiceRecorder() {
   const { toast } = useToast();
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const recordingTimeoutRef = useRef<number | null>(null);
+  const recordingBytesRef = useRef(0);
   const requestRef = useRef<AbortController | null>(null);
   const processingRef = useRef(false);
   const lastCommandRef = useRef<string | null>(null);
@@ -117,10 +119,22 @@ export function useVoiceRecorder() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const preferredMimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
       const mimeType = preferredMimeTypes.find((candidate) => MediaRecorder.isTypeSupported(candidate));
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 64_000 } : { audioBitsPerSecond: 64_000 });
       chunksRef.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recordingBytesRef.current = 0;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size <= 0) return;
+        recordingBytesRef.current += e.data.size;
+        if (recordingBytesRef.current > 8 * 1024 * 1024) {
+          dispatch(setVoiceError("Recording is too large. Please keep it under one minute."));
+          recorder.stop();
+          return;
+        }
+        chunksRef.current.push(e.data);
+      };
       recorder.onstop = async () => {
+        if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
+        recordingTimeoutRef.current = null;
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size < 1000) { dispatch(setVoiceError("Audio too short. Please speak longer.")); return; }
@@ -128,6 +142,12 @@ export function useVoiceRecorder() {
       };
       mediaRecorderRef.current = recorder;
       recorder.start(250);
+      recordingTimeoutRef.current = window.setTimeout(() => {
+        if (recorder.state === "recording") {
+          dispatch(setVoiceError("Recording limit reached. Processing the first minute."));
+          recorder.stop();
+        }
+      }, 60_000);
       dispatch(setRecording(true));
     } catch {
       dispatch(setVoiceError("Microphone permission denied. Use text input instead."));
@@ -136,6 +156,8 @@ export function useVoiceRecorder() {
   }, [dispatch, processAudio]);
 
   const stopRecording = useCallback(() => {
+    if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
+    recordingTimeoutRef.current = null;
     mediaRecorderRef.current?.stop();
     dispatch(setRecording(false));
   }, [dispatch]);

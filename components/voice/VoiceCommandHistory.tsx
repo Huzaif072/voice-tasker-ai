@@ -32,7 +32,7 @@ export function VoiceCommandHistory({ sessions }: VoiceCommandHistoryProps) {
           <div className="min-w-0 flex-1">
             <p className="text-sm text-slate-200">{session.inputText}</p>
             <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-              <span className="capitalize">{session.parsedIntent.action}</span>
+              <span className="capitalize">{session.parsedIntent?.action ?? "voice command"}</span>
               <span>·</span>
               <span>{Math.round(session.confidence * 100)}%</span>
               <span>·</span>

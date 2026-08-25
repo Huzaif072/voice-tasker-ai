@@ -10,6 +10,12 @@ export function sanitizeUserForExport(user: UserDocument) {
     provider: user.provider,
     emailVerifiedAt: user.emailVerifiedAt,
     voiceSettings: user.voiceSettings,
+    ...(user.reminderSettings ? { reminderSettings: user.reminderSettings } : {}),
+    ...(user.behaviorProfile ? { behaviorProfile: user.behaviorProfile } : {}),
+    ...(user.privacyPolicyVersion ? { privacyPolicyVersion: user.privacyPolicyVersion } : {}),
+    ...(user.termsVersion ? { termsVersion: user.termsVersion } : {}),
+    ...(user.privacyConsentAt ? { privacyConsentAt: user.privacyConsentAt } : {}),
+    ...(user.termsAcceptedAt ? { termsAcceptedAt: user.termsAcceptedAt } : {}),
     createdAt: user.createdAt,
   };
 }

@@ -20,6 +20,7 @@ export function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptLegal, setAcceptLegal] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
@@ -36,13 +37,17 @@ export function SignupForm() {
       setError("Passwords do not match.");
       return;
     }
+    if (!acceptLegal) {
+      setError("Please accept the Terms of Service and Privacy Policy.");
+      return;
+    }
     setLoading(true);
 
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, returnTo }),
+        body: JSON.stringify({ name, email, password, returnTo, acceptLegal }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Signup failed");
@@ -102,6 +107,10 @@ export function SignupForm() {
             labelClassName="text-slate-300"
             required
           />
+          <label className="flex items-start gap-3 text-sm text-slate-300">
+            <input type="checkbox" checked={acceptLegal} onChange={(event) => setAcceptLegal(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-800 text-violet-500" />
+            <span>I accept the <Link href="/terms" className="text-violet-400 hover:text-violet-300">Terms of Service</Link> and <Link href="/privacy" className="text-violet-400 hover:text-violet-300">Privacy Policy</Link>.</span>
+          </label>
           <p id="signup-password-requirements" className="-mt-2 text-xs leading-5 text-slate-400">
             Use at least 8 characters, including one uppercase letter and one number.
           </p>
@@ -139,11 +148,8 @@ export function SignupForm() {
 
         <AuthFooterLink text="Already signed up?" linkText="Go to login" href="/login" />
 
-        <p className="mt-8 text-center text-xs text-slate-400">
-          By signing up, you agree to our{" "}
-          <Link href="/terms" className="text-violet-400 hover:text-violet-300">Terms of Service</Link>{" "}
-          and <Link href="/privacy" className="text-violet-400 hover:text-violet-300">Privacy Policy</Link>.
-        </p>
+                  <p className="mt-8 text-center text-xs text-slate-400">Your legal choices are recorded with your account and can be updated from Security settings.</p>
+
       </div>
     </div>
   );

@@ -9,6 +9,10 @@ import { getVoiceSessionsCollection } from "@/lib/db/models/VoiceSession";
 import { getReminderDeliveriesCollection } from "@/lib/db/models/ReminderDelivery";
 import { MAX_EXPORT_RECORDS, sanitizeUserForExport } from "@/lib/account/export";
 import { checkAccountExportRateLimit, getRetryAfterSeconds } from "@/lib/auth/rate-limit";
+import { decryptUserJson, decryptUserText } from "@/lib/privacy/fieldEncryption";
+import type { ParsedIntent, VoiceConversationState } from "@/types/voice";
+import { getLegalConsentsCollection } from "@/lib/db/models/LegalConsent";
+import { getTaskInvitationsCollection } from "@/lib/db/models/TaskInvitation";
 
 function serialize<T extends { _id?: ObjectId }>(value: T) {
   const { _id, ...rest } = value;
@@ -32,38 +36,45 @@ export async function GET(request: Request) {
   try {
     const db = await connectWithRetry();
     const userId = new ObjectId(auth.user.id);
-    const [users, tasksCollection, notificationsCollection, sessionsCollection, deliveriesCollection] = await Promise.all([
+    const [users, tasksCollection, notificationsCollection, sessionsCollection, deliveriesCollection, consentsCollection, invitationsCollection] = await Promise.all([
       getUsersCollection(db),
       getTasksCollection(db),
       getNotificationsCollection(db),
       getVoiceSessionsCollection(db),
       getReminderDeliveriesCollection(db),
+      getLegalConsentsCollection(db),
+      getTaskInvitationsCollection(db),
     ]);
     const taskFilter = { createdBy: auth.user.id };
     const notificationFilter = { userId: auth.user.id };
     const sessionFilter = { userId: auth.user.id };
     const deliveryFilter = { userId: auth.user.id };
-    const [user, taskCount, notificationCount, sessionCount, deliveryCount] = await Promise.all([
+    const invitationFilter = { $or: [{ ownerId: auth.user.id }, { recipientEmail: auth.user.email.toLowerCase() }] };
+    const [user, taskCount, notificationCount, sessionCount, deliveryCount, consentCount, invitationCount] = await Promise.all([
       users.findOne({ _id: userId }),
       tasksCollection.countDocuments(taskFilter, { limit: MAX_EXPORT_RECORDS + 1 }),
       notificationsCollection.countDocuments(notificationFilter, { limit: MAX_EXPORT_RECORDS + 1 }),
       sessionsCollection.countDocuments(sessionFilter, { limit: MAX_EXPORT_RECORDS + 1 }),
       deliveriesCollection.countDocuments(deliveryFilter, { limit: MAX_EXPORT_RECORDS + 1 }),
+      consentsCollection.countDocuments({ userId: auth.user.id }, { limit: MAX_EXPORT_RECORDS + 1 }),
+      invitationsCollection.countDocuments(invitationFilter, { limit: MAX_EXPORT_RECORDS + 1 }),
     ]);
 
     if (!user) return NextResponse.json({ error: "Account not found" }, { status: 404 });
-    if ([taskCount, notificationCount, sessionCount, deliveryCount].some((count) => count > MAX_EXPORT_RECORDS)) {
+    if ([taskCount, notificationCount, sessionCount, deliveryCount, consentCount, invitationCount].some((count) => count > MAX_EXPORT_RECORDS)) {
       return NextResponse.json(
         { error: "Account export is too large. Please contact support for a complete export." },
         { status: 413 },
       );
     }
 
-    const [tasks, notifications, sessions, reminderDeliveries] = await Promise.all([
+    const [tasks, notifications, sessions, reminderDeliveries, consents, invitations] = await Promise.all([
       tasksCollection.find(taskFilter).toArray(),
       notificationsCollection.find(notificationFilter).toArray(),
       sessionsCollection.find(sessionFilter).toArray(),
       deliveriesCollection.find(deliveryFilter).toArray(),
+      consentsCollection.find({ userId: auth.user.id }).toArray(),
+      invitationsCollection.find(invitationFilter).project({ tokenHash: 0 }).toArray(),
     ]);
 
     const payload = {
@@ -71,8 +82,10 @@ export async function GET(request: Request) {
       user: sanitizeUserForExport(user),
       tasks: tasks.map(serialize),
       notifications: notifications.map(serialize),
-      voiceSessions: sessions.map(serialize),
+      voiceSessions: sessions.map((session) => serialize({ ...session, inputText: decryptUserText(session.inputTextEncrypted ?? session.inputText), parsedIntent: decryptUserJson<ParsedIntent>(session.parsedIntentEncrypted) ?? session.parsedIntent, conversationContext: decryptUserJson<Omit<VoiceConversationState, "conversationId">>(session.conversationContextEncrypted) ?? session.conversationContext, expiresAt: session.expiresAt instanceof Date ? session.expiresAt.toISOString() : session.expiresAt })),
       reminderDeliveries: reminderDeliveries.map(serialize),
+      legalConsents: consents.map(serialize),
+      taskInvitations: invitations.map(serialize),
     };
 
     return new Response(JSON.stringify(payload, null, 2), {

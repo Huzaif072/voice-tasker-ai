@@ -9,6 +9,9 @@ import { getVoiceSessionsCollection } from "@/lib/db/models/VoiceSession";
 import { getReminderDeliveriesCollection } from "@/lib/db/models/ReminderDelivery";
 import { invalidateCache } from "@/lib/redis/ratelimit";
 import { accountDeleteSchema } from "@/lib/validators/account";
+import { getTaskInvitationsCollection } from "@/lib/db/models/TaskInvitation";
+import { getLegalConsentsCollection } from "@/lib/db/models/LegalConsent";
+import { getAnalyticsCollection } from "@/lib/analytics/events";
 
 function isTransactionUnsupported(error: unknown): boolean {
   const code = (error as { code?: number }).code;
@@ -16,13 +19,16 @@ function isTransactionUnsupported(error: unknown): boolean {
   return code === 20 || code === 263 || /transaction numbers are only allowed|replica set|mongos/i.test(message);
 }
 
-async function deleteAccountData(db: Db, userId: ObjectId, ownerId: string, session?: ClientSession) {
-  const [users, tasks, notifications, sessions, deliveries] = await Promise.all([
+async function deleteAccountData(db: Db, userId: ObjectId, ownerId: string, email: string, session?: ClientSession) {
+  const [users, tasks, notifications, sessions, deliveries, invitations, consents, analytics] = await Promise.all([
     getUsersCollection(db),
     getTasksCollection(db),
     getNotificationsCollection(db),
     getVoiceSessionsCollection(db),
     getReminderDeliveriesCollection(db),
+    getTaskInvitationsCollection(db),
+    getLegalConsentsCollection(db),
+    getAnalyticsCollection(db),
   ]);
   const options = session ? { session } : undefined;
 
@@ -30,6 +36,9 @@ async function deleteAccountData(db: Db, userId: ObjectId, ownerId: string, sess
   await notifications.deleteMany({ userId: ownerId }, options);
   await sessions.deleteMany({ userId: ownerId }, options);
   await deliveries.deleteMany({ userId: ownerId }, options);
+  await invitations.deleteMany({ $or: [{ ownerId }, { recipientEmail: email.toLowerCase() }] }, options);
+  await consents.deleteMany({ userId: ownerId }, options);
+  await analytics.deleteMany({ userId: ownerId }, options);
   const deleted = await users.deleteOne({ _id: userId }, options);
   if (deleted.deletedCount === 0) throw new Error("ACCOUNT_NOT_FOUND");
 }
@@ -60,11 +69,11 @@ export async function DELETE(request: Request) {
     try {
       try {
         await session.withTransaction(async () => {
-          await deleteAccountData(db, userId, auth.user.id, session);
+          await deleteAccountData(db, userId, auth.user.id, auth.user.email, session);
         });
       } catch (error) {
         if (!isTransactionUnsupported(error)) throw error;
-        await deleteAccountData(db, userId, auth.user.id);
+        await deleteAccountData(db, userId, auth.user.id, auth.user.email);
       }
     } finally {
       await session.endSession();

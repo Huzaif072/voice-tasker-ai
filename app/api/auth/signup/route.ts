@@ -8,6 +8,7 @@ import { createOneTimeToken, getAppUrl } from "@/lib/auth/tokens";
 import { isDuplicateKeyError } from "@/lib/db/errors";
 import { auditAuthEvent } from "@/lib/auth/audit";
 import { getSafeReturnTo } from "@/lib/auth/redirect";
+import { recordLegalConsent, PRIVACY_POLICY_VERSION, TERMS_VERSION } from "@/lib/privacy/legal";
 
 export async function POST(request: Request) {
   try {
@@ -45,8 +46,13 @@ export async function POST(request: Request) {
       emailVerificationTokenHash: verification.hash,
       emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       sessionVersion: 0,
+      privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+      termsVersion: TERMS_VERSION,
+      privacyConsentAt: now,
+      termsAcceptedAt: now,
     });
 
+    await recordLegalConsent(db, result.insertedId.toString(), "signup", now);
     auditAuthEvent("signup", { userId: result.insertedId.toString(), provider: "credentials" });
     const user = { id: result.insertedId.toString(), name, email };
     const baseUrl = getAppUrl();

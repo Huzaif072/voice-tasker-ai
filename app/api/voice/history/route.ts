@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/middleware";
 import { connectWithRetry } from "@/lib/db/mongodb";
 import { getVoiceSessionsCollection } from "@/lib/db/models/VoiceSession";
+import { decryptUserJson, decryptUserText } from "@/lib/privacy/fieldEncryption";
+import type { ParsedIntent } from "@/types/voice";
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
@@ -10,7 +12,7 @@ export async function GET(request: Request) {
     const db = await connectWithRetry();
     const sessions = await getVoiceSessionsCollection(db);
     const rows = await sessions.find({ userId: auth.user.id }).sort({ timestamp: -1 }).limit(25).toArray();
-    return NextResponse.json({ sessions: rows.map((row) => ({ _id: row._id?.toString(), conversationId: row.conversationId, inputText: row.inputText, parsedIntent: row.parsedIntent, taskId: row.taskId, model: row.model, confidence: row.confidence, timestamp: row.timestamp })) });
+    return NextResponse.json({ sessions: rows.map((row) => ({ _id: row._id?.toString(), conversationId: row.conversationId, inputText: decryptUserText(row.inputTextEncrypted ?? row.inputText), parsedIntent: decryptUserJson<ParsedIntent>(row.parsedIntentEncrypted) ?? row.parsedIntent, taskId: row.taskId, model: row.model, confidence: row.confidence, timestamp: row.timestamp, expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt })) });
   } catch (error) {
     console.error("Voice history error:", error);
     return NextResponse.json({ error: "Unable to load voice history" }, { status: 503 });

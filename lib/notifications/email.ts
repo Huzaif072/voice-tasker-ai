@@ -89,12 +89,16 @@ function escapeHtml(value: string) {
 export async function sendDelegationEmail(
   to: string,
   taskTitle: string,
-  fromName: string
+  fromName: string,
+  invitationUrl?: string,
 ): Promise<boolean> {
+  const safeTitle = escapeHtml(taskTitle);
+  const safeName = escapeHtml(fromName);
+  const safeUrl = invitationUrl ? escapeHtml(invitationUrl) : undefined;
   return sendEmail({
     to,
     subject: `Task delegated: ${taskTitle}`,
-    html: `<p>${fromName} delegated a task to you: <strong>${taskTitle}</strong></p>`,
+    html: `<p>${safeName} delegated a task to you: <strong>${safeTitle}</strong></p>${safeUrl ? `<p><a href="${safeUrl}">Review and respond to this assignment</a></p><p>This invitation expires in seven days.</p>` : ""}`,
   });
 }
 

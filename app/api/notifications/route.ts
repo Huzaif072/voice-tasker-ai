@@ -3,6 +3,7 @@ import { parseNotificationId } from "@/lib/notifications/ids";
 import { requireAuth } from "@/lib/auth/middleware";
 import { connectWithRetry } from "@/lib/db/mongodb";
 import { getNotificationsCollection } from "@/lib/db/models/Notification";
+import { decryptUserText } from "@/lib/privacy/fieldEncryption";
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
       .toArray();
 
     return NextResponse.json({
-      notifications: items.map((n) => ({ ...n, _id: n._id?.toString() })),
+      notifications: items.map((n) => ({ ...n, message: decryptUserText(n.message), expiresAt: n.expiresAt instanceof Date ? n.expiresAt.toISOString() : n.expiresAt, _id: n._id?.toString() })),
     });
   } catch (error) {
     console.error("Notification lookup error:", error);

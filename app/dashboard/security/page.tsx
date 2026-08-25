@@ -27,6 +27,7 @@ export default function SecurityPage() {
   const [savingReminders, setSavingReminders] = useState(false);
   const [locationTriggersEnabled, setLocationTriggersEnabled] = useState(false);
   const [providerHealth, setProviderHealth] = useState<ProviderHealth | null>(null);
+  const [consentStatus, setConsentStatus] = useState<{ accepted: boolean; current: { privacyPolicyVersion: string; termsVersion: string } } | null>(null);
 
   useEffect(() => {
     if (window.localStorage.getItem(contextLocationStorageKey) === "true") queueMicrotask(() => setLocationTriggersEnabled(true));
@@ -48,6 +49,13 @@ export default function SecurityPage() {
     fetch("/api/health/providers")
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => { if (data?.providers) setProviderHealth(data.providers); })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/account/consent")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => { if (data) setConsentStatus({ accepted: Boolean(data.accepted), current: data.current }); })
       .catch(() => undefined);
   }, []);
 
@@ -94,6 +102,22 @@ export default function SecurityPage() {
         : [...current.channels, channel];
       return { ...current, channels: channels.includes("in_app") ? channels : ["in_app", ...channels] };
     });
+  }
+
+  async function renewConsent() {
+    setLoading(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/account/consent", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to save consent");
+      setConsentStatus({ accepted: true, current: { privacyPolicyVersion: data.privacyPolicyVersion, termsVersion: data.termsVersion } });
+      setMessage("Your Terms and Privacy Policy consent was recorded.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to save consent.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function unlinkProvider(provider: string) {
@@ -220,6 +244,13 @@ export default function SecurityPage() {
         </label>
       </section>
       {providerHealth ? <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6"><h2 className="text-lg font-semibold text-slate-100">Provider status</h2><p className="mt-2 text-sm text-slate-400">Configuration status only; credentials and provider error details are never shown.</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{Object.entries(providerHealth).map(([name, status]) => <div key={name} className="flex items-center justify-between rounded-lg border border-slate-800 px-3 py-2 text-sm"><span className="capitalize text-slate-300">{name.replace(/([A-Z])/g, " $1")}</span><span className={status === "ok" || status === "ready" || status === "configured" ? "text-emerald-300" : status === "disabled" || status === "unconfigured" ? "text-slate-500" : "text-amber-300"}>{status}</span></div>)}</div></section> : null}
+      <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
+        <h2 className="text-lg font-semibold text-slate-100">Legal choices</h2>
+        <p className="mt-2 text-sm text-slate-400">Review the current policy versions recorded for your account. Your consent history is included in account exports.</p>
+        <p className="mt-3 text-sm text-slate-300">Status: {consentStatus?.accepted ? "Current" : "Needs review"}</p>
+        {consentStatus ? <p className="mt-1 text-xs text-slate-500">Privacy {consentStatus.current.privacyPolicyVersion} · Terms {consentStatus.current.termsVersion}</p> : null}
+        <Button className="mt-4" onClick={renewConsent} loading={loading}>Review and accept current policies</Button>
+      </section>
       <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
         <h2 className="text-lg font-semibold text-slate-100">Your data</h2>
         <p className="mt-2 text-sm text-slate-400">Download a JSON copy of your profile, tasks, notifications, and voice history.</p>

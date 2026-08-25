@@ -4,6 +4,7 @@ import { getTokenFromRequest, verifyToken } from "@/lib/auth/jwt";
 import { connectWithRetry } from "@/lib/db/mongodb";
 import { getUsersCollection } from "@/lib/db/models/User";
 import { isSessionVersionCurrent } from "@/lib/auth/session";
+import { trackEvent } from "@/lib/analytics/events";
 
 export async function GET(request: Request) {
   const token = getTokenFromRequest(request);
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ user: null });
     }
 
+    await trackEvent(db, user._id!.toString(), "app_active", { source: "session_check" });
     return NextResponse.json({
       user: {
         id: user._id!.toString(),

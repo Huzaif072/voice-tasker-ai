@@ -45,6 +45,10 @@ export interface User {
   emailVerifiedAt?: string;
   sessionVersion?: number;
   disabledAt?: string;
+  privacyPolicyVersion?: string;
+  termsVersion?: string;
+  privacyConsentAt?: string;
+  termsAcceptedAt?: string;
   voiceSettings: VoiceSettings;
   pushSubscription?: unknown;
   pushSubscriptionUpdatedAt?: string;

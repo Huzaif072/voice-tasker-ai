@@ -154,10 +154,11 @@ export async function parseIntent(inputText: string): Promise<ParsedIntent & { c
 export function basicRegexIntent(inputText: string): ParsedIntent & { confidence: number } {
   const lower = inputText.toLowerCase();
   let action: ParsedIntent["action"] = "create";
-  if (lower.includes("delete") || lower.includes("remove")) action = "delete";
-  else if (lower.includes("complete") || lower.includes("done") || lower.includes("finished")) action = "update";
-  else if (lower.includes("what") || lower.includes("show") || lower.includes("list")) action = "query";
-  else if (lower.includes("assign") || lower.includes("delegate") || lower.includes("ask ")) action = "delegate";
+  if (/\b(delete|remove)\b/.test(lower)) action = "delete";
+  else if (/\b(complete|finish|mark|done|finished)\b/.test(lower)) action = "update";
+  else if (/\b(assign|delegate|ask)\b/.test(lower)) action = "delegate";
+  else if (/\b(what|show|list)\b/.test(lower)) action = "query";
+  else if (/\b(update|change|reschedule|edit)\b/.test(lower)) action = "update";
 
   const taskTitle = cleanTaskTitle(inputText.replace(/^(create|add|delete|remove|complete|finish|mark)\s+(the\s+)?(task\s+)?/i, ""));
   const durationMatch = lower.match(/(?:for|lasting)\s+(\d+)\s*(minutes?|hours?)/);

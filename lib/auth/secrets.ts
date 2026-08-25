@@ -1,8 +1,8 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 function getKey() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret.length < 32) throw new Error("JWT_SECRET is not configured securely");
+  const secret = process.env.FIELD_ENCRYPTION_KEY ?? process.env.JWT_SECRET ?? (process.env.NODE_ENV === "production" ? undefined : "dev-field-encryption-key-change-in-production");
+  if (!secret || secret.length < 32) throw new Error("FIELD_ENCRYPTION_KEY or JWT_SECRET is not configured securely");
   return createHash("sha256").update(secret).digest();
 }
 

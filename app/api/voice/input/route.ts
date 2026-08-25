@@ -26,10 +26,14 @@ import { captureException } from "@/lib/monitoring/capture";
 import { validateTaskDependencies } from "@/lib/tasks/dependencies";
 import { createAssignmentNotification, findAssignableUser } from "@/lib/tasks/assignments";
 import { recordRealtimeEvent } from "@/lib/realtime/events";
+import { buildInvitationUrl, createTaskInvitation } from "@/lib/tasks/invitations";
+import { getTaskInvitationsCollection } from "@/lib/db/models/TaskInvitation";
+import { encryptUserJson, encryptUserText, decryptUserJson } from "@/lib/privacy/fieldEncryption";
 
 type VoiceIntent = ParsedIntent & { confidence: number };
 const destructiveActions = new Set(["update", "delete", "delegate"]);
 const VOICE_PROVIDER_TIMEOUT_MS = 15_000;
+const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 
 function actionMessage(action: string, taskTitle?: string, success = true): string {
   if (!success) return taskTitle ? `Could not find a task matching "${taskTitle}".` : "Action could not be completed.";
@@ -108,6 +112,7 @@ export async function POST(request: Request) {
       const form = await request.formData();
       const file = form.get("audio");
       if (!(file instanceof File)) return NextResponse.json({ error: "Audio file is required" }, { status: 400 });
+      if (file.size > MAX_AUDIO_BYTES) return NextResponse.json({ error: "Audio recording is too large. Keep recordings under eight megabytes." }, { status: 413 });
       body = { audio: Buffer.from(await file.arrayBuffer()).toString("base64"), mimeType: file.type || "audio/webm", conversationId: typeof form.get("conversationId") === "string" ? form.get("conversationId") : undefined };
     } else {
       body = await request.json();
@@ -130,8 +135,9 @@ export async function POST(request: Request) {
     const previousSession = parsed.data.conversationId
       ? await sessions.find({ userId, conversationId }).sort({ timestamp: -1 }).limit(1).next()
       : null;
-    const previousContext: VoiceConversationState = previousSession?.conversationContext
-      ? { conversationId, ...previousSession.conversationContext }
+    const storedContext = previousSession?.conversationContext ?? decryptUserJson<Omit<VoiceConversationState, "conversationId">>(previousSession?.conversationContextEncrypted);
+    const previousContext: VoiceConversationState = storedContext
+      ? { conversationId, ...storedContext }
       : { conversationId, updatedAt: new Date().toISOString() };
 
     let intent: VoiceIntent;
@@ -149,8 +155,8 @@ export async function POST(request: Request) {
     let conversationContext: VoiceConversationState = { ...previousContext, updatedAt: now };
 
     async function logSession(taskId?: string, nextIntent: VoiceIntent = intent) {
-      await sessions.insertOne({ userId, conversationId, conversationContext: { pendingIntent: conversationContext.pendingIntent, pendingConfirmationToken: conversationContext.pendingConfirmationToken, lastQueryTasks: conversationContext.lastQueryTasks, lastTaskId: conversationContext.lastTaskId, lastTaskTitle: conversationContext.lastTaskTitle, updatedAt: conversationContext.updatedAt },
- inputText: transcript, parsedIntent: nextIntent, taskId, model: "llama-3.3-70b-versatile", confidence: nextIntent.confidence, timestamp: now });
+      const retentionDays = Math.max(7, Number(process.env.VOICE_SESSION_RETENTION_DAYS ?? 90));
+      await sessions.insertOne({ userId, conversationId, conversationContextEncrypted: encryptUserJson({ pendingIntent: conversationContext.pendingIntent, pendingConfirmationToken: conversationContext.pendingConfirmationToken, lastQueryTasks: conversationContext.lastQueryTasks, lastTaskId: conversationContext.lastTaskId, lastTaskTitle: conversationContext.lastTaskTitle, updatedAt: conversationContext.updatedAt }), inputTextEncrypted: encryptUserText(transcript), parsedIntentEncrypted: encryptUserJson(nextIntent), taskId, model: "llama-3.3-70b-versatile", confidence: nextIntent.confidence, timestamp: now, expiresAt: new Date(Date.now() + retentionDays * 24 * 60 * 60 * 1000) });
       await trackEvent(db, userId, "voice_session", { action: nextIntent.action, confidence: nextIntent.confidence });
     }
 
@@ -255,10 +261,17 @@ export async function POST(request: Request) {
         if (intent.assignee && !validEmail || intent.assigneePhone && !validPhone) { success = false; message = "Please provide a valid assignee email or international E.164 phone number."; }
         else {
           const recipient = await findAssignableUser(db, intent.assignee);
-          await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { ...(intent.assignee ? { delegatedTo: intent.assignee.toLowerCase() } : {}), ...(intent.assigneePhone ? { delegatedPhone: intent.assigneePhone } : {}), ...(recipient?._id ? { assigneeUserId: recipient._id.toString(), assignmentStatus: "pending" as const } : { assignmentStatus: "none" as const }), delegationStatus: "pending", updatedAt: now }, ...(recipient?._id ? {} : { $unset: { assigneeUserId: "" } }) });
+          let invitationUrl: string | undefined;
+          if (!recipient && (intent.assignee || intent.assigneePhone)) {
+            const invitations = await getTaskInvitationsCollection(db);
+            await invitations.updateMany({ taskId: existing._id!.toString(), ownerId: auth.user.id, status: "pending" }, { $set: { status: "revoked" } });
+            const invitation = await createTaskInvitation(db, { taskId: existing._id!.toString(), ownerId: auth.user.id, recipientEmail: intent.assignee?.toLowerCase(), recipientPhone: intent.assigneePhone });
+            invitationUrl = buildInvitationUrl(invitation.token);
+          }
+          await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { ...(intent.assignee ? { delegatedTo: intent.assignee.toLowerCase() } : {}), ...(intent.assigneePhone ? { delegatedPhone: intent.assigneePhone } : {}), ...(recipient?._id ? { assigneeUserId: recipient._id.toString(), assignmentStatus: "pending" as const } : { assignmentStatus: invitationUrl ? "pending" as const : "none" as const }), delegationStatus: "pending", updatedAt: now }, ...(recipient?._id ? {} : { $unset: { assigneeUserId: "" } }) });
           if (recipient?._id) await createAssignmentNotification(db, recipient._id.toString(), existing._id!.toString(), existing.title, auth.user.name);
-          const emailSent = intent.assignee ? await sendDelegationEmail(intent.assignee.toLowerCase(), existing.title, auth.user.name) : false;
-          const smsResult = intent.assigneePhone ? await sendSms(intent.assigneePhone, `${auth.user.name} delegated a task to you: ${existing.title}`) : { sent: false, configured: false, permanent: false };
+          const emailSent = intent.assignee ? await sendDelegationEmail(intent.assignee.toLowerCase(), existing.title, auth.user.name, invitationUrl) : false;
+          const smsResult = intent.assigneePhone ? await sendSms(intent.assigneePhone, `${auth.user.name} delegated a task to you: ${existing.title}${invitationUrl ? ` Review it here: ${invitationUrl}` : ""}`) : { sent: false, configured: false, permanent: false };
           const delivered = emailSent || smsResult.sent;
           await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { delegationStatus: delivered ? "sent" : "failed", updatedAt: new Date().toISOString() } });
           await recordRealtimeEvent(db, auth.user.id, "task_updated", existing._id!.toString());

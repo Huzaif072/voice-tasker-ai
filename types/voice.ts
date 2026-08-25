@@ -35,13 +35,17 @@ export interface VoiceSession {
   userId: string;
   conversationId?: string;
   conversationContext?: Omit<VoiceConversationState, "conversationId">;
+  conversationContextEncrypted?: string;
   rawAudioUrl?: string;
-  inputText: string;
-  parsedIntent: ParsedIntent;
+  inputText?: string;
+  parsedIntent?: ParsedIntent;
+  inputTextEncrypted?: string;
+  parsedIntentEncrypted?: string;
   taskId?: string;
   model: string;
   confidence: number;
   timestamp: string;
+  expiresAt?: string;
 }
 
 export interface VoiceInputRequest {

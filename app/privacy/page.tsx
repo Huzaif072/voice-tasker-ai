@@ -10,7 +10,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      lastUpdated="August 24, 2026"
+      lastUpdated="August 26, 2026"
       intro="This policy explains the information VoiceTasker AI handles while you create and manage tasks by voice."
     >
       <h2>1. Information we collect</h2>
@@ -53,25 +53,31 @@ export default function PrivacyPage() {
 
       <h2>5. Retention and deletion</h2>
       <p>
-        Account deletion removes the user-owned task, notification, voice-session, and account records through
-        the application’s account-deletion flow, subject to lawful retention requirements. Terminal reminder
-        delivery records expire after the configured 90-day period. The deployment owner must publish retention
-        periods for active tasks, voice-session history, analytics events, logs, backups, and provider-side data.
+        Account deletion removes user-owned tasks, notifications, voice sessions, reminder deliveries, analytics events,
+        legal-consent records, and invitation records through the application’s account-deletion flow. Pending invitations
+        are revoked when their task is deleted. Voice-session records and in-app notifications use configurable MongoDB
+        expiration windows that default to 90 days; analytics events default to 730 days. Active tasks remain until you
+        delete them or delete your account. MongoDB TTL cleanup is asynchronous, so deployment owners must also publish
+        their log, backup, and provider-side retention periods.
       </p>
 
       <h2>6. Security</h2>
       <p>
-        The application uses password hashing, signed authentication tokens, input validation, ownership
-        checks, encrypted calendar tokens, redacted provider-health responses, and optional rate limiting. No
-        online service can guarantee absolute security. Deployment owners must configure strong secrets, HTTPS,
-        access controls, monitoring, tested backups, and an incident-response process.
+        The application uses password hashing, signed authentication tokens, input validation, ownership checks,
+        AES-256-GCM encryption for stored voice transcripts, parsed intents, conversation context, and notification
+        messages, encrypted calendar tokens, redacted provider-health responses, and rate limiting. Searchable identity
+        fields and task titles remain queryable so authentication, task lookup, and ownership checks continue to work.
+        No online service can guarantee absolute security. Deployment owners must configure strong secrets, HTTPS,
+        access controls, monitoring, tested backups, key rotation, and an incident-response process.
       </p>
 
       <h2>7. Your choices</h2>
       <p>
-        You can use the account export and deletion controls, submit typed commands instead of audio, disable
-        optional provider integrations, and contact the address below for privacy requests. Correction, access,
-        restriction, portability, and objection rights depend on applicable law and the deployment owner’s process.
+        You can use the account export and deletion controls, submit typed commands instead of audio, renew your
+        policy consent from account settings, disable optional provider integrations, and contact the address below for
+        privacy requests. Exports include account data, tasks, notifications, voice history, reminder deliveries,
+        invitation records, and legal-consent history. Correction, access, restriction, portability, and objection rights
+        still depend on applicable law and the deployment owner’s documented process.
       </p>
 
       <h2>8. Contact</h2>

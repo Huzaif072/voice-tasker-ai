@@ -13,6 +13,9 @@ import { trackEvent } from "@/lib/analytics/events";
 import { buildCalendarComposeLink } from "@/lib/calendar/link";
 import { createAssignmentNotification, findAssignableUser } from "@/lib/tasks/assignments";
 import { recordRealtimeEvent } from "@/lib/realtime/events";
+import { buildInvitationUrl, createTaskInvitation } from "@/lib/tasks/invitations";
+import { sendDelegationEmail } from "@/lib/notifications/email";
+import { sendSms } from "@/lib/notifications/sms";
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
@@ -110,6 +113,15 @@ export async function POST(request: Request) {
     if (recipient?._id) {
       await createAssignmentNotification(db, recipient._id.toString(), result.insertedId.toString(), parsed.data.title, auth.user.name);
       await recordRealtimeEvent(db, recipient._id.toString(), "assignment_changed", result.insertedId.toString());
+    } else if (parsed.data.delegatedTo || parsed.data.delegatedPhone) {
+      const taskId = result.insertedId.toString();
+      const invitation = await createTaskInvitation(db, { taskId, ownerId: auth.user.id, recipientEmail: parsed.data.delegatedTo?.toLowerCase(), recipientPhone: parsed.data.delegatedPhone });
+      const invitationUrl = buildInvitationUrl(invitation.token);
+      await tasks.updateOne({ _id: result.insertedId, createdBy: auth.user.id }, { $set: { assignmentStatus: "pending", updatedAt: new Date().toISOString() } });
+      const emailSent = parsed.data.delegatedTo ? await sendDelegationEmail(parsed.data.delegatedTo, parsed.data.title, auth.user.name, invitationUrl) : false;
+      const smsResult = parsed.data.delegatedPhone ? await sendSms(parsed.data.delegatedPhone, `${auth.user.name} delegated a task to you: ${parsed.data.title}. Review it here: ${invitationUrl}`) : { sent: false, configured: false, permanent: false };
+      await tasks.updateOne({ _id: result.insertedId, createdBy: auth.user.id }, { $set: { delegationStatus: emailSent || smsResult.sent ? "sent" : "failed", updatedAt: new Date().toISOString() } });
+      await recordRealtimeEvent(db, auth.user.id, "task_updated", taskId);
     }
     await trackEvent(db, auth.user.id, "task_created", { source: "ui" });
     await invalidateCache(`tasks:${auth.user.id}:*`);
