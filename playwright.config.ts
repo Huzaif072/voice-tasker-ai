@@ -13,9 +13,9 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: process.env.PLAYWRIGHT_BASE_URL ? undefined : {
-    command: "npm run dev",
+    command: process.env.PLAYWRIGHT_PRODUCTION ? "npm run start" : "npm run dev",
     url: "http://127.0.0.1:3000",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && !process.env.PLAYWRIGHT_PRODUCTION,
     timeout: 120_000,
   },
   projects: [

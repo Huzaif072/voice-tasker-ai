@@ -16,8 +16,10 @@
     "test:account": "tsx scripts/account-regression-smoke.test.ts",
     "test:health": "tsx scripts/health-regression-smoke.test.ts",
     "test:routes": "tsx scripts/routes-regression-smoke.test.ts",
+    "test:reminders": "tsx scripts/reminder-worker-regression-smoke.test.ts",
     "test:e2e": "playwright test",
-    "test:all": "npm run test:auth && npm run test:voice && npm run test:tasks && npm run test:notifications && npm run test:delegation && npm run test:api && npm run test:account && npm run test:health && npm run test:routes"
+    "test:e2e:prod": "PLAYWRIGHT_PRODUCTION=true playwright test",
+    "test:all": "npm run test:auth && npm run test:voice && npm run test:tasks && npm run test:notifications && npm run test:delegation && npm run test:api && npm run test:account && npm run test:health && npm run test:routes && npm run test:reminders"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",

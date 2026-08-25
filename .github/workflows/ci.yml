@@ -35,3 +35,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Browser smoke tests
         run: npm run test:e2e
+      - name: Production-server browser smoke tests
+        run: npm run test:e2e:prod

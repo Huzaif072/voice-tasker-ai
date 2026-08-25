@@ -14,9 +14,19 @@ self.addEventListener("push", (event) => {
   }));
 });
 
+function safeNotificationUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl || "/dashboard/notifications", self.location.origin);
+    if (url.origin !== self.location.origin) return "/dashboard/notifications";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/dashboard/notifications";
+  }
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/dashboard/notifications";
+  const url = safeNotificationUrl(event.notification.data?.url);
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       const existing = clients.find((client) => "focus" in client);

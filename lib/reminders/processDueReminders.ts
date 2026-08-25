@@ -4,12 +4,13 @@ import { getNotificationsCollection } from "@/lib/db/models/Notification";
 import { getUsersCollection, defaultReminderSettings, type UserDocument } from "@/lib/db/models/User";
 import { getReminderDeliveriesCollection, type ReminderDeliveryDocument } from "@/lib/db/models/ReminderDelivery";
 import { sendEmail } from "@/lib/notifications/email";
-import { sendPushNotification } from "@/lib/notifications/push";
+import { sendPushNotificationResult } from "@/lib/notifications/push";
 
 const MAX_REMINDERS_PER_RUN = 100;
 const MAX_DELIVERIES_PER_RUN = 100;
 const MAX_DELIVERY_ATTEMPTS = 5;
 const DELIVERY_LEASE_MS = 2 * 60 * 1000;
+const DELIVERY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
 export interface ReminderRunResult {
   scanned: number;
@@ -99,23 +100,25 @@ async function claimDelivery(
 async function deliver(
   delivery: ReminderDeliveryDocument,
   user: UserDocument | undefined,
-): Promise<boolean> {
-  if (!user) return false;
+): Promise<{ sent: boolean; permanentFailure: boolean; error?: string }> {
+  if (!user) return { sent: false, permanentFailure: true, error: "Owner account no longer exists" };
   if (delivery.channel === "email" && user.email) {
-    return sendEmail({
+    const sent = await sendEmail({
       to: user.email,
       subject: `Reminder: ${delivery.taskTitle}`,
       html: `<p>You asked to be reminded about <strong>${escapeHtml(delivery.taskTitle)}</strong>.</p>`,
     });
+    return { sent, permanentFailure: false, error: sent ? undefined : "Email provider rejected the notification" };
   }
   if (delivery.channel === "push" && user.pushSubscription) {
-    return sendPushNotification(user.pushSubscription, {
+    const result = await sendPushNotificationResult(user.pushSubscription, {
       title: "Task reminder",
       body: delivery.taskTitle,
       url: `/dashboard/tasks?task=${delivery.taskId}`,
     });
+    return { sent: result.ok, permanentFailure: result.permanentFailure, error: result.error };
   }
-  return false;
+  return { sent: false, permanentFailure: true, error: "Delivery channel is no longer configured" };
 }
 
 export async function processDueReminders(db: Db, now = new Date()): Promise<ReminderRunResult> {
@@ -180,24 +183,28 @@ export async function processDueReminders(db: Db, now = new Date()): Promise<Rem
         if (fetchedUser) deliveryUser = fetchedUser;
       }
     }
-    const sent = await deliver(delivery, deliveryUser);
+    const outcome = await deliver(delivery, deliveryUser);
     const updatedAt = now.toISOString();
-    if (sent) {
+    if (outcome.sent) {
       deliveriesSent += 1;
       await deliveries.updateOne(
         { _id: delivery._id, status: "sending" },
-        { $set: { status: "sent", updatedAt }, $unset: { leaseUntil: "", lastError: "" } },
+        { $set: { status: "sent", updatedAt, expiresAt: new Date(now.getTime() + DELIVERY_RETENTION_MS) }, $unset: { leaseUntil: "", lastError: "" } },
       );
-    } else if (delivery.attempts >= MAX_DELIVERY_ATTEMPTS) {
+    } else if (outcome.permanentFailure || delivery.attempts >= MAX_DELIVERY_ATTEMPTS) {
       deliveriesFailed += 1;
+      if (outcome.permanentFailure && delivery.channel === "push") {
+        const id = userObjectId(delivery.userId);
+        if (id) await users.updateOne({ _id: id }, { $unset: { pushSubscription: "", pushSubscriptionUpdatedAt: "" } });
+      }
       await deliveries.updateOne(
         { _id: delivery._id, status: "sending" },
-        { $set: { status: "failed", lastError: "Delivery provider rejected the notification", updatedAt }, $unset: { leaseUntil: "" } },
+        { $set: { status: "failed", lastError: outcome.error ?? "Delivery provider rejected the notification", updatedAt, expiresAt: new Date(now.getTime() + DELIVERY_RETENTION_MS) }, $unset: { leaseUntil: "" } },
       );
     } else {
       await deliveries.updateOne(
         { _id: delivery._id, status: "sending" },
-        { $set: { status: "pending", nextAttemptAt: retryAt(now, delivery.attempts), lastError: "Delivery provider rejected the notification", updatedAt }, $unset: { leaseUntil: "" } },
+        { $set: { status: "pending", nextAttemptAt: retryAt(now, delivery.attempts), lastError: outcome.error ?? "Delivery provider rejected the notification", updatedAt }, $unset: { leaseUntil: "", expiresAt: "" } },
       );
     }
   }

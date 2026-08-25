@@ -17,6 +17,7 @@ export interface ReminderDeliveryDocument {
   lastError?: string;
   createdAt: string;
   updatedAt: string;
+  expiresAt?: Date;
 }
 
 export const REMINDER_DELIVERIES_COLLECTION = "reminder_deliveries";
@@ -29,6 +30,7 @@ export async function getReminderDeliveriesCollection(db: Db): Promise<Collectio
       collection.createIndex({ reminderKey: 1, channel: 1 }, { unique: true }),
       collection.createIndex({ status: 1, nextAttemptAt: 1 }),
       collection.createIndex({ userId: 1, createdAt: -1 }),
+      collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     ]).then(() => undefined).catch((error) => {
       indexesPromise = null;
       throw error;
