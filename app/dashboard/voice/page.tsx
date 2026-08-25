@@ -20,7 +20,7 @@ export default function VoicePage() {
   const dispatch = useDispatch();
   const { isRecording, isProcessing, transcript, interimTranscript, parsedIntent, queryResults, error, followUpPrompts, conversationId, calendarLink } = useSelector((s: RootState) => s.voice);
   const { data: history = [] } = useVoiceHistory();
-  const { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, startNewConversation, supported } = useVoiceRecorder();
+  const { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, retryUpload, startNewConversation, supported } = useVoiceRecorder();
   const [textInput, setTextInput] = useState("");
   const [liveListening, setLiveListening] = useState(false);
   const { start: startLiveRecognition, stop: stopLiveRecognition, supported: liveSupported } = useVoiceRecognition((text) => { if (text) void submitText(text); });
@@ -41,17 +41,18 @@ export default function VoicePage() {
         {liveSupported ? <Button type="button" variant={liveListening ? "primary" : "secondary"} onClick={() => { if (liveListening) { stopLiveRecognition(); setLiveListening(false); } else { startLiveRecognition(); setLiveListening(true); } }} disabled={isProcessing}>{liveListening ? "Stop live voice" : "Use live voice"}</Button> : null}
         {!supported ? <p className="text-sm text-amber-400" role="status">Microphone unavailable. Use text input below.</p> : null}
         {isProcessing ? <Button type="button" variant="ghost" onClick={cancelProcessing}>Cancel processing</Button> : null}
+        {error && !isProcessing ? <Button type="button" variant="ghost" onClick={() => void retryUpload()}>Retry voice upload</Button> : null}
         {conversationId ? <p className="text-xs text-slate-600" aria-label="Conversation is active">Conversation active</p> : null}
       </div>
 
-      <VoiceTranscript transcript={transcript} interim={interimTranscript} isListening={isRecording} />
+      <VoiceTranscript transcript={transcript} interim={interimTranscript} isListening={isRecording || liveListening} />
       {parsedIntent ? <VoiceIntentPreview intent={parsedIntent} onDismiss={dismissPreview} onConfirm={confirmLastCommand} onSelectTask={(title) => setTextInput(`${parsedIntent.action} ${title}`)} /> : null}
       {calendarLink ? <a href={calendarLink} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 text-center text-sm text-violet-200 hover:bg-violet-500/20">Open calendar link</a> : null}
       {followUpPrompts.length ? <section aria-labelledby="voice-followups-heading" className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-4"><h3 id="voice-followups-heading" className="text-sm font-semibold text-slate-300">Continue the conversation</h3><div className="mt-3 flex flex-wrap gap-2">{followUpPrompts.map((prompt) => <Button key={prompt} type="button" size="sm" variant="ghost" onClick={() => submitText(prompt)} disabled={isProcessing}>{prompt}</Button>)}</div></section> : null}
       {conversationId ? <div className="flex justify-end"><FeedbackButtons category="voice" conversationId={conversationId} /></div> : null}
       {error ? <p className="text-center text-sm text-red-400" role="alert" aria-live="assertive">{error}</p> : null}
       {queryResults.length ? <section aria-labelledby="voice-results-heading" className="space-y-3"><h3 id="voice-results-heading" className="text-sm font-semibold text-slate-300">Matching tasks</h3>{queryResults.map((task) => <div key={task._id} className="flex items-center justify-between rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 py-2 text-sm"><span className="text-slate-200">{task.title}</span><span className="capitalize text-slate-400">{task.status} · {task.priority}</span></div>)}</section> : null}
-      <p className="sr-only" aria-live="polite">{isRecording ? "Listening" : isProcessing ? "Processing voice command" : ""}</p>
+      <p className="sr-only" aria-live="polite">{isRecording || liveListening ? "Listening. Live words appear as you speak." : isProcessing ? "Processing voice command" : error ? `Voice error: ${error}` : "Voice input idle"}</p>
 
       <form className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-4" onSubmit={(event) => { event.preventDefault(); if (textInput.trim()) { submitText(textInput.trim()); setTextInput(""); } }}>
         <label htmlFor="voice-command-input" className="mb-3 block text-sm text-slate-400">Or type your command:</label>

@@ -55,12 +55,14 @@ export async function POST(request: Request) {
     const recipient = await findAssignableUser(db, email);
     let invitationUrl: string | undefined;
     let invitationExpiresAt: Date | undefined;
+    let phoneVerificationCode: string | undefined;
     if (!recipient && (email || phone)) {
       const invitations = await getTaskInvitationsCollection(db);
       await invitations.updateMany({ taskId, ownerId: auth.user.id, status: "pending" }, { $set: { status: "revoked" } });
       const invitation = await createTaskInvitation(db, { taskId, ownerId: auth.user.id, recipientEmail: email?.toLowerCase(), recipientPhone: phone });
       invitationUrl = buildInvitationUrl(invitation.token);
       invitationExpiresAt = invitation.expiresAt;
+      phoneVerificationCode = invitation.phoneVerificationCode;
     }
 
     const encryptedUpdate = encryptedTaskUpdate(task, { delegatedTo: email ?? task.delegatedTo, delegatedPhone: phone ?? task.delegatedPhone });
@@ -86,7 +88,7 @@ export async function POST(request: Request) {
     }
 
     const emailSent = email ? await sendDelegationEmail(email, task.title, auth.user.name, invitationUrl) : false;
-    const smsResult = phone ? await sendSms(phone, `${auth.user.name} delegated a task to you: ${task.title}${invitationUrl ? ` Review it here: ${invitationUrl}` : ""}`) : { sent: false, configured: false, permanent: false };
+    const smsResult = phone ? await sendSms(phone, `${auth.user.name} delegated a task to you: ${task.title}${phoneVerificationCode ? ` Your verification code is ${phoneVerificationCode}.` : ""}${invitationUrl ? ` Review it here: ${invitationUrl}` : ""}`) : { sent: false, configured: false, permanent: false };
     const delivered = emailSent || smsResult.sent;
     await tasks.updateOne(
       taskFilter,

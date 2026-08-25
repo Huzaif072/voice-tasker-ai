@@ -1,7 +1,7 @@
 import type { Db, Collection, ObjectId } from "mongodb";
 import type { Task } from "@/types/task";
 
-export type TaskDocument = Omit<Task, "_id"> & { _id?: ObjectId; contentEncrypted?: string };
+export type TaskDocument = Omit<Task, "_id"> & { _id?: ObjectId; contentEncrypted?: string; searchTokens?: string[] };
 
 export const TASKS_COLLECTION = "tasks";
 let indexesPromise: Promise<void> | null = null;
@@ -16,6 +16,7 @@ export async function getTasksCollection(db: Db): Promise<Collection<TaskDocumen
       col.createIndex({ assigneeUserId: 1, assignmentStatus: 1, updatedAt: -1 }),
       col.createIndex({ createdBy: 1, dueDate: 1 }),
       col.createIndex({ createdBy: 1, title: "text", description: "text", tags: "text" }),
+      col.createIndex({ createdBy: 1, searchTokens: 1 }),
     ]).then(() => undefined).catch((error) => { indexesPromise = null; throw error; });
   }
   await indexesPromise;

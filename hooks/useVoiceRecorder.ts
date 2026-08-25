@@ -24,6 +24,15 @@ import { speakText } from "@/lib/voice/speak";
 function subscribeToMediaSupport() { return () => undefined; }
 function getMediaSupportSnapshot() { return Boolean(navigator.mediaDevices?.getUserMedia); }
 function getServerMediaSupportSnapshot() { return false; }
+const VOICE_UPLOAD_STATE_KEY = "voicetasker:voice-upload";
+
+type VoiceUploadState = { uploadId: string; nextIndex: number; mimeType: string };
+function readVoiceUploadState(): VoiceUploadState | null {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(VOICE_UPLOAD_STATE_KEY) ?? "null") as VoiceUploadState | null;
+    return parsed && typeof parsed.uploadId === "string" && Number.isInteger(parsed.nextIndex) ? parsed : null;
+  } catch { return null; }
+}
 
 interface VoiceResponse {
   transcript?: string;
@@ -48,6 +57,8 @@ export function useVoiceRecorder() {
   const recordingTimeoutRef = useRef<number | null>(null);
   const recordingBytesRef = useRef(0);
   const requestRef = useRef<AbortController | null>(null);
+  const pendingChunksRef = useRef<Blob[] | null>(null);
+  const pendingMimeTypeRef = useRef("audio/webm");
   const processingRef = useRef(false);
   const lastCommandRef = useRef<string | null>(null);
   const confirmationTokenRef = useRef<string | null>(null);
@@ -90,17 +101,38 @@ export function useVoiceRecorder() {
       requestRef.current = controller;
       dispatch(setProcessing(true));
       try {
-        let uploadId: string | undefined;
-        for (const [index, chunk] of chunks.entries()) {
-          const form = new FormData();
-          form.append("chunk", chunk, `voice-chunk-${index}.webm`);
-          form.append("index", String(index));
-          form.append("mimeType", mimeType || "audio/webm");
-          if (uploadId) form.append("uploadId", uploadId);
-          const chunkResponse = await fetch("/api/voice/chunk", { method: "POST", body: form, signal: controller.signal });
-          const chunkData = await chunkResponse.json();
-          if (!chunkResponse.ok) throw new Error(chunkData.error ?? "Voice upload failed");
-          uploadId = chunkData.uploadId;
+        pendingChunksRef.current = chunks;
+        pendingMimeTypeRef.current = mimeType || "audio/webm";
+        const saved = readVoiceUploadState();
+        let uploadId: string | undefined = saved?.mimeType === pendingMimeTypeRef.current ? saved.uploadId : undefined;
+        let startIndex = uploadId ? saved?.nextIndex ?? 0 : 0;
+        for (let index = startIndex; index < chunks.length; index += 1) {
+          const chunk = chunks[index];
+          let completed = false;
+          for (let attempt = 0; attempt < 3 && !completed; attempt += 1) {
+            const form = new FormData();
+            form.append("chunk", chunk, `voice-chunk-${index}.webm`);
+            form.append("index", String(index));
+            form.append("mimeType", pendingMimeTypeRef.current);
+            if (uploadId) form.append("uploadId", uploadId);
+            const chunkResponse = await fetch("/api/voice/chunk", { method: "POST", body: form, signal: controller.signal });
+            const chunkData = await chunkResponse.json().catch(() => ({}));
+            if (chunkResponse.ok) {
+              if (typeof chunkData.uploadId !== "string") throw new Error("Voice upload did not return an upload ID");
+              const confirmedUploadId = chunkData.uploadId;
+              uploadId = confirmedUploadId;
+              localStorage.setItem(VOICE_UPLOAD_STATE_KEY, JSON.stringify({ uploadId: confirmedUploadId, nextIndex: index + 1, mimeType: pendingMimeTypeRef.current } satisfies VoiceUploadState));
+              completed = true;
+            } else if (attempt === 2 && uploadId && (chunkResponse.status === 404 || chunkResponse.status === 410)) {
+              localStorage.removeItem(VOICE_UPLOAD_STATE_KEY);
+              uploadId = undefined;
+              startIndex = 0;
+              index = -1;
+              completed = true;
+            } else if (attempt === 2) throw new Error(chunkData.error ?? "Voice upload failed");
+            else await new Promise((resolve) => window.setTimeout(resolve, 250 * (attempt + 1)));
+          }
+          if (index === -1) continue;
         }
         if (!uploadId) throw new Error("No audio chunks were captured");
         const res = await fetch("/api/voice/input", {
@@ -112,6 +144,8 @@ export function useVoiceRecorder() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         handleVoiceResponse(data);
+        localStorage.removeItem(VOICE_UPLOAD_STATE_KEY);
+        pendingChunksRef.current = null;
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         dispatch(setVoiceError(err instanceof Error ? err.message : "Processing failed"));
@@ -133,6 +167,8 @@ export function useVoiceRecorder() {
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 64_000 } : { audioBitsPerSecond: 64_000 });
       chunksRef.current = [];
       recordingBytesRef.current = 0;
+      pendingChunksRef.current = null;
+      localStorage.removeItem(VOICE_UPLOAD_STATE_KEY);
       recorder.ondataavailable = (e) => {
         if (e.data.size <= 0) return;
         recordingBytesRef.current += e.data.size;
@@ -213,6 +249,10 @@ export function useVoiceRecorder() {
     dispatch(newVoiceConversation());
   }, [dispatch]);
 
+  const retryUpload = useCallback(() => {
+    if (pendingChunksRef.current?.length) return processAudio(pendingChunksRef.current, pendingMimeTypeRef.current);
+  }, [processAudio]);
+
   const cancelProcessing = useCallback(() => {
     requestRef.current?.abort();
     processingRef.current = false;
@@ -220,12 +260,16 @@ export function useVoiceRecorder() {
     dispatch(setVoiceError("Voice processing cancelled."));
   }, [dispatch]);
 
-  return { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, startNewConversation, supported };
+  return { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, retryUpload, startNewConversation, supported };
 }
 
 export function useVoiceRecognition(onFinal?: (text: string) => void) {
   const dispatch = useDispatch();
   const recognitionRef = useRef<InstanceType<NonNullable<typeof window.SpeechRecognition>> | null>(null);
+  const finalTranscriptRef = useRef("");
+  const onFinalRef = useRef(onFinal);
+
+  useEffect(() => { onFinalRef.current = onFinal; }, [onFinal]);
 
   useEffect(() => {
     const SpeechRecognition = typeof window !== "undefined" ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
@@ -241,16 +285,25 @@ export function useVoiceRecognition(onFinal?: (text: string) => void) {
         const t = event.results[i][0].transcript;
         if (event.results[i].isFinal) final += t; else interim += t;
       }
-      if (final) {
-        dispatch(setTranscript(final));
-        onFinal?.(final.trim());
-      }
+      if (final) finalTranscriptRef.current = `${finalTranscriptRef.current} ${final}`.trim();
+      dispatch(setTranscript(finalTranscriptRef.current));
       dispatch(setInterimTranscript(interim));
     };
+    recognition.addEventListener("end", () => {
+      const text = finalTranscriptRef.current.trim();
+      dispatch(setInterimTranscript(""));
+      if (text) onFinalRef.current?.(text);
+      finalTranscriptRef.current = "";
+    });
     recognitionRef.current = recognition;
-  }, [dispatch, onFinal]);
+  }, [dispatch]);
 
-  const start = useCallback(() => recognitionRef.current?.start(), []);
+  const start = useCallback(() => {
+    finalTranscriptRef.current = "";
+    dispatch(setTranscript(""));
+    dispatch(setInterimTranscript(""));
+    recognitionRef.current?.start();
+  }, [dispatch]);
   const stop = useCallback(() => recognitionRef.current?.stop(), []);
   return { start, stop, supported: Boolean(typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition)) };
 }

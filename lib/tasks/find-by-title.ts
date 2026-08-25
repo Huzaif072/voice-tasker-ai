@@ -1,6 +1,8 @@
 import type { Collection } from "mongodb";
 import type { TaskDocument } from "@/lib/db/models/Task";
-import { decryptTaskDocument } from "@/lib/privacy/taskEncryption";
+import { decryptTaskDocument, taskSearchTokens } from "@/lib/privacy/taskEncryption";
+
+function escapeRegex(value: string) { return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
 export async function findTasksByTitle(
   tasks: Collection<TaskDocument>,
@@ -10,7 +12,8 @@ export async function findTasksByTitle(
 ): Promise<TaskDocument[]> {
   const cleaned = title.trim();
   if (!cleaned) return [];
-  const candidates = await tasks.find({ createdBy: userId, status: { $ne: "cancelled" } }).sort({ updatedAt: -1 }).limit(500).toArray();
+  const searchTokens = taskSearchTokens({ title: cleaned });
+  const candidates = await tasks.find({ createdBy: userId, status: { $ne: "cancelled" }, $or: [{ searchTokens: { $all: searchTokens } }, { title: { $regex: escapeRegex(cleaned), $options: "i" } }] }).sort({ updatedAt: -1 }).limit(500).toArray();
   const lowered = cleaned.toLowerCase();
   const words = lowered.split(/\s+/).filter((word) => word.length > 2);
   return candidates

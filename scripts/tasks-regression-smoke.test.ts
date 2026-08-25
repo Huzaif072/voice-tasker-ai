@@ -65,8 +65,9 @@ if (!parsedQuery.success || parsedQuery.data.page !== 2 || parsedQuery.data.limi
   throw new Error("Task query parameters should parse bounded pagination and false boolean values correctly");
 }
 const queryFilter = buildTaskFilter("user-1", parsedQuery.data);
-if (queryFilter.createdBy !== "user-1" || !queryFilter.$text || queryFilter.$text.$search !== "quarterly") {
-  throw new Error("Task search filters must remain user-scoped and use the text-search contract");
+const searchBranches = queryFilter.$or ?? queryFilter.$and?.flatMap((item) => item.$or ?? []);
+if (queryFilter.createdBy !== "user-1" || !searchBranches?.some((branch) => "$text" in branch || "searchTokens" in branch)) {
+  throw new Error("Task search filters must remain user-scoped and use the blind-index/text-search contract");
 }
 
 console.log("PASS: legacy and malformed task records normalize safely; editable task payloads and query contracts validate.");

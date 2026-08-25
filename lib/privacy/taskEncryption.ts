@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import type { Task } from "@/types/task";
 import type { TaskDocument } from "@/lib/db/models/Task";
 import type { ObjectId } from "mongodb";
@@ -20,6 +21,13 @@ export type EncryptedTaskContent = {
 };
 
 type TaskStorageLike = Omit<Partial<Task>, "_id"> & { _id?: string | ObjectId; contentEncrypted?: string };
+
+export function taskSearchTokens(task: Partial<Task>) {
+  const text = [task.title, task.description, task.calendarQuery, ...(task.tags ?? []), ...(task.subtasks ?? []).map((item) => item.title)].filter(Boolean).join(" ").toLowerCase();
+  const secret = process.env.FIELD_ENCRYPTION_KEY ?? process.env.JWT_SECRET ?? (process.env.NODE_ENV === "production" ? undefined : "dev-field-encryption-key-change-in-production");
+  if (!secret || secret.length < 32) throw new Error("FIELD_ENCRYPTION_KEY or JWT_SECRET is not configured securely");
+  return [...new Set(text.split(/[^\p{L}\p{N}]+/u).filter((token) => token.length >= 2).map((token) => createHmac("sha256", secret).update(token).digest("hex")))];
+}
 
 export const ENCRYPTED_TASK_FIELDS = [
   "title",
@@ -53,6 +61,7 @@ export function encryptTaskDocument(task: Partial<Task>) {
   const stored: Record<string, unknown> = { ...task };
   for (const field of ENCRYPTED_TASK_FIELDS) delete stored[field];
   stored.contentEncrypted = encryptUserJson(taskContentFromPublic(task));
+  stored.searchTokens = taskSearchTokens(task);
   return stored;
 }
 
@@ -70,7 +79,7 @@ export function decryptTaskDocument<T extends TaskStorageLike>(task: T): T {
 
 export function encryptedTaskUpdate(existing: TaskStorageLike, updates: Partial<Task>) {
   const next = { ...existing, ...updates };
-  const $set: Record<string, unknown> = { contentEncrypted: encryptUserJson(taskContentFromPublic(next as Partial<Task>)) };
+  const $set: Record<string, unknown> = { contentEncrypted: encryptUserJson(taskContentFromPublic(next as Partial<Task>)), searchTokens: taskSearchTokens(next as Partial<Task>) };
   const $unset: Record<string, ""> = {};
   for (const field of ENCRYPTED_TASK_FIELDS) $unset[field] = "";
   return { $set, $unset };

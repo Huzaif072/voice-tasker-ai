@@ -1,6 +1,7 @@
 import type { Filter } from "mongodb";
 import { z } from "zod";
 import type { TaskDocument } from "@/lib/db/models/Task";
+import { taskSearchTokens } from "@/lib/privacy/taskEncryption";
 
 const booleanQuery = z.preprocess(
   (value) => value === true || value === "true",
@@ -28,7 +29,17 @@ export function buildTaskFilter(userId: string, query: TaskQuery): Filter<TaskDo
   if (query.status) filter.status = query.status;
   if (query.active) filter.status = { $in: ["pending", "in_progress"] };
   if (query.highPriority) filter.priority = { $in: ["high", "urgent"] };
-  if (query.search) filter.$text = { $search: query.search };
+  if (query.search) {
+    const searchTokens = taskSearchTokens({ title: query.search });
+    const contentSearch = searchTokens.length ? [{ searchTokens: { $all: searchTokens } }, { $text: { $search: query.search } }] : [{ $text: { $search: query.search } }];
+    if (filter.$or) {
+      const ownership = filter.$or;
+      delete filter.$or;
+      filter.$and = [{ $or: ownership }, { $or: contentSearch }];
+    } else {
+      filter.$or = contentSearch;
+    }
+  }
   return filter;
 }
 

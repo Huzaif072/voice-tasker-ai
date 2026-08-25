@@ -5,13 +5,13 @@ import { connectWithRetry } from "@/lib/db/mongodb";
 import { getTasksCollection } from "@/lib/db/models/Task";
 import { getTaskInvitationsCollection } from "@/lib/db/models/TaskInvitation";
 import { createAssignmentStatusNotification } from "@/lib/tasks/assignments";
-import { findTaskInvitation } from "@/lib/tasks/invitations";
+import { findTaskInvitation, verifyPhoneInvitationCode } from "@/lib/tasks/invitations";
 import { recordRealtimeEvent } from "@/lib/realtime/events";
 import { z } from "zod";
 import { decryptTaskDocument } from "@/lib/privacy/taskEncryption";
 
 type Params = { params: Promise<{ token: string }> };
-const actionSchema = z.object({ action: z.enum(["accept", "decline"]) });
+const actionSchema = z.object({ action: z.enum(["accept", "decline"]), verificationCode: z.string().regex(/^\d{6}$/, "Enter the six-digit phone verification code").optional() });
 
 function cleanToken(value: string) {
   return value.trim().replace(/[^A-Za-z0-9_-]/g, "");
@@ -25,7 +25,7 @@ export async function GET(_request: Request, { params }: Params) {
     const db = await connectWithRetry();
     const invitation = await findTaskInvitation(db, token);
     if (!invitation) return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
-    return NextResponse.json({ status: invitation.status, expiresAt: invitation.expiresAt.toISOString(), recipientEmail: invitation.recipientEmail ?? null });
+    return NextResponse.json({ status: invitation.status, expiresAt: invitation.expiresAt.toISOString(), recipientEmail: invitation.recipientEmail ?? null, phoneVerificationRequired: Boolean(invitation.recipientPhone), phoneVerified: Boolean(invitation.phoneVerifiedAt) });
   } catch {
     return NextResponse.json({ error: "Invitation unavailable" }, { status: 503 });
   }
@@ -48,6 +48,11 @@ export async function POST(request: Request, { params }: Params) {
     if (!invitation) return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
     if (invitation.status !== "pending") return NextResponse.json({ error: "Invitation is no longer active", status: invitation.status }, { status: 409 });
     if (invitation.recipientEmail && invitation.recipientEmail !== auth.user.email.toLowerCase()) return NextResponse.json({ error: "Sign in with the invited email address" }, { status: 403 });
+    if (invitation.recipientPhone && !invitation.phoneVerifiedAt) {
+      if (!parsed.data.verificationCode) return NextResponse.json({ error: "Enter the six-digit verification code sent to the invited phone" }, { status: 428 });
+      const verified = await verifyPhoneInvitationCode(db, invitation, parsed.data.verificationCode);
+      if (!verified) return NextResponse.json({ error: (invitation.phoneVerificationAttempts ?? 0) >= 4 ? "Too many invalid verification attempts" : "Invalid or expired verification code" }, { status: (invitation.phoneVerificationAttempts ?? 0) >= 4 ? 429 : 403 });
+    }
     if (!ObjectId.isValid(invitation.taskId)) return NextResponse.json({ error: "Invitation task is invalid" }, { status: 409 });
 
     const status = parsed.data.action === "accept" ? "accepted" : "declined";

@@ -131,7 +131,7 @@ export async function POST(request: Request) {
       const invitationUrl = buildInvitationUrl(invitation.token);
       await tasks.updateOne({ _id: result.insertedId, createdBy: auth.user.id }, { $set: { assignmentStatus: "pending", updatedAt: new Date().toISOString() } });
       const emailSent = parsed.data.delegatedTo ? await sendDelegationEmail(parsed.data.delegatedTo, parsed.data.title, auth.user.name, invitationUrl) : false;
-      const smsResult = parsed.data.delegatedPhone ? await sendSms(parsed.data.delegatedPhone, `${auth.user.name} delegated a task to you: ${parsed.data.title}. Review it here: ${invitationUrl}`) : { sent: false, configured: false, permanent: false };
+      const smsResult = parsed.data.delegatedPhone ? await sendSms(parsed.data.delegatedPhone, `${auth.user.name} delegated a task to you: ${parsed.data.title}. Your verification code is ${invitation.phoneVerificationCode}. Review it here: ${invitationUrl}`) : { sent: false, configured: false, permanent: false };
       await tasks.updateOne({ _id: result.insertedId, createdBy: auth.user.id }, { $set: { delegationStatus: emailSent || smsResult.sent ? "sent" : "failed", updatedAt: new Date().toISOString() } });
       await recordRealtimeEvent(db, auth.user.id, "task_updated", taskId);
     }

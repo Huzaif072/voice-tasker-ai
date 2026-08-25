@@ -272,16 +272,19 @@ export async function POST(request: Request) {
         else {
           const recipient = await findAssignableUser(db, intent.assignee);
           let invitationUrl: string | undefined;
+          let phoneVerificationCode: string | undefined;
           if (!recipient && (intent.assignee || intent.assigneePhone)) {
             const invitations = await getTaskInvitationsCollection(db);
             await invitations.updateMany({ taskId: existing._id!.toString(), ownerId: auth.user.id, status: "pending" }, { $set: { status: "revoked" } });
             const invitation = await createTaskInvitation(db, { taskId: existing._id!.toString(), ownerId: auth.user.id, recipientEmail: intent.assignee?.toLowerCase(), recipientPhone: intent.assigneePhone });
             invitationUrl = buildInvitationUrl(invitation.token);
+            phoneVerificationCode = invitation.phoneVerificationCode;
           }
-          await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { ...(intent.assignee ? { delegatedTo: intent.assignee.toLowerCase() } : {}), ...(intent.assigneePhone ? { delegatedPhone: intent.assigneePhone } : {}), ...(recipient?._id ? { assigneeUserId: recipient._id.toString(), assignmentStatus: "pending" as const } : { assignmentStatus: invitationUrl ? "pending" as const : "none" as const }), delegationStatus: "pending", updatedAt: now }, ...(recipient?._id ? {} : { $unset: { assigneeUserId: "" } }) });
+          const encryptedUpdate = encryptedTaskUpdate(existing, { delegatedTo: intent.assignee?.toLowerCase() ?? existing.delegatedTo, delegatedPhone: intent.assigneePhone ?? existing.delegatedPhone });
+          await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { ...encryptedUpdate.$set, ...(recipient?._id ? { assigneeUserId: recipient._id.toString(), assignmentStatus: "pending" as const } : { assignmentStatus: invitationUrl ? "pending" as const : "none" as const }), delegationStatus: "pending", updatedAt: now }, $unset: { ...encryptedUpdate.$unset, ...(recipient?._id ? {} : { assigneeUserId: "" }) } });
           if (recipient?._id) await createAssignmentNotification(db, recipient._id.toString(), existing._id!.toString(), existing.title, auth.user.name);
           const emailSent = intent.assignee ? await sendDelegationEmail(intent.assignee.toLowerCase(), existing.title, auth.user.name, invitationUrl) : false;
-          const smsResult = intent.assigneePhone ? await sendSms(intent.assigneePhone, `${auth.user.name} delegated a task to you: ${existing.title}${invitationUrl ? ` Review it here: ${invitationUrl}` : ""}`) : { sent: false, configured: false, permanent: false };
+          const smsResult = intent.assigneePhone ? await sendSms(intent.assigneePhone, `${auth.user.name} delegated a task to you: ${existing.title}${phoneVerificationCode ? ` Your verification code is ${phoneVerificationCode}.` : ""}${invitationUrl ? ` Review it here: ${invitationUrl}` : ""}`) : { sent: false, configured: false, permanent: false };
           const delivered = emailSent || smsResult.sent;
           await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { delegationStatus: delivered ? "sent" : "failed", updatedAt: new Date().toISOString() } });
           await recordRealtimeEvent(db, auth.user.id, "task_updated", existing._id!.toString());

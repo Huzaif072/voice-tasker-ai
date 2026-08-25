@@ -26,11 +26,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-slate-900">
+      <a href="#main-content" className="sr-only z-[100] rounded-md bg-white px-4 py-2 text-slate-950 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to main content</a>
       <Sidebar userName={user?.name} onLogout={logout} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="md:pl-60">
         <DashboardSearchProvider>
           <Header onMenuOpen={() => setSidebarOpen(true)} />
-          <main className="p-4 pb-28 md:p-8">{children}</main>
+          <main id="main-content" tabIndex={-1} className="p-4 pb-28 outline-none md:p-8">{children}</main>
         </DashboardSearchProvider>
       </div>
 

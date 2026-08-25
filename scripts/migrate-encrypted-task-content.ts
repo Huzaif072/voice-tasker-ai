@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getTasksCollection } from "@/lib/db/models/Task";
-import { encryptTaskDocument, ENCRYPTED_TASK_FIELDS } from "@/lib/privacy/taskEncryption";
+import { decryptTaskDocument, encryptTaskDocument, ENCRYPTED_TASK_FIELDS } from "@/lib/privacy/taskEncryption";
 import { getReminderDeliveriesCollection } from "@/lib/db/models/ReminderDelivery";
 import { encryptUserJson, encryptUserText } from "@/lib/privacy/fieldEncryption";
 import { getUsersCollection } from "@/lib/db/models/User";
@@ -30,11 +30,12 @@ async function main() {
   const db = await connectWithRetry();
   const tasks = await getTasksCollection(db);
   let migrated = 0;
-  const cursor = tasks.find({ contentEncrypted: { $exists: false }, $or: ENCRYPTED_TASK_FIELDS.map((field) => ({ [field]: { $exists: true } })) });
+  const cursor = tasks.find({ $or: [{ contentEncrypted: { $exists: false }, $or: ENCRYPTED_TASK_FIELDS.map((field) => ({ [field]: { $exists: true } })) }, { searchTokens: { $exists: false } }] });
   for await (const task of cursor) {
-    const encrypted = encryptTaskDocument({ ...task, _id: task._id?.toString() }) as { contentEncrypted: string };
-    const $unset = Object.fromEntries(ENCRYPTED_TASK_FIELDS.map((field) => [field, ""])) as Record<string, "">;
-    await tasks.updateOne({ _id: task._id }, { $set: { contentEncrypted: encrypted.contentEncrypted }, $unset });
+    const publicTask = decryptTaskDocument({ ...task, _id: task._id?.toString() });
+    const encrypted = encryptTaskDocument(publicTask) as { contentEncrypted: string; searchTokens: string[] };
+    const $unset = Object.fromEntries(ENCRYPTED_TASK_FIELDS.filter((field) => Object.prototype.hasOwnProperty.call(task, field)).map((field) => [field, ""])) as Record<string, "">;
+    await tasks.updateOne({ _id: task._id }, { $set: { contentEncrypted: encrypted.contentEncrypted, searchTokens: encrypted.searchTokens }, ...(Object.keys($unset).length ? { $unset } : {}) });
     migrated += 1;
   }
   const deliveries = await getReminderDeliveriesCollection(db);

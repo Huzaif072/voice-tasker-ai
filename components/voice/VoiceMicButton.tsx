@@ -43,11 +43,14 @@ export function VoiceMicButton({
       <motion.button
         type="button"
         onClick={onClick}
+        disabled={isProcessing}
+        aria-pressed={isRecording}
+        aria-busy={isProcessing}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         className={cn(
           "relative z-10 flex items-center justify-center rounded-full bg-violet-600 text-white shadow-lg shadow-violet-600/40",
-          "focus:outline-none focus:ring-4 focus:ring-violet-500/30",
+          "focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/30",
           isRecording && "bg-red-500 shadow-red-500/40",
           sizes[size]
         )}

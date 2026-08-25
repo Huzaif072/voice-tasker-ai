@@ -13,6 +13,10 @@ export interface TaskInvitationDocument {
   expiresAt: Date;
   respondedAt?: string;
   respondedBy?: string;
+  phoneVerificationCodeHash?: string;
+  phoneVerificationExpiresAt?: Date;
+  phoneVerificationAttempts?: number;
+  phoneVerifiedAt?: string;
 }
 
 const COLLECTION = "task_invitations";

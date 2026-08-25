@@ -15,9 +15,7 @@ export function VoiceTranscript({ transcript, interim, isListening }: VoiceTrans
   return (
     <Card className="min-h-[100px]">
       <div className="mb-2 flex items-center gap-2">
-        <span
-          className={`h-2 w-2 rounded-full ${isListening ? "animate-pulse bg-red-500" : "bg-slate-500"}`}
-        />
+        <span aria-hidden="true" className={`h-2 w-2 rounded-full ${isListening ? "animate-pulse bg-red-500" : "bg-slate-500"}`} />
         <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
           {isListening ? "Listening..." : "Transcript"}
         </span>
@@ -25,6 +23,8 @@ export function VoiceTranscript({ transcript, interim, isListening }: VoiceTrans
       <AnimatePresence mode="wait">
         <motion.p
           key={display}
+          aria-live="polite"
+          aria-atomic="true"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="text-slate-200 leading-relaxed"
