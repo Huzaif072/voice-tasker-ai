@@ -13,6 +13,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ sessions: rows.map((row) => ({ ...row, _id: row._id?.toString() })) });
   } catch (error) {
     console.error("Voice history error:", error);
-    return NextResponse.json({ error: "Unable to load voice history" }, { status: 500 });
+    return NextResponse.json({ error: "Unable to load voice history" }, { status: 503 });
   }
 }

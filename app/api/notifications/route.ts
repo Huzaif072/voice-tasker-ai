@@ -20,7 +20,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       notifications: items.map((n) => ({ ...n, _id: n._id?.toString() })),
     });
-  } catch {
+  } catch (error) {
+    console.error("Notification lookup error:", error);
     return NextResponse.json({ error: "Failed to load notifications" }, { status: 503 });
   }
 }
