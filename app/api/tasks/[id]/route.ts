@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { requireAuth } from "@/lib/auth/middleware";
 import { connectWithRetry } from "@/lib/db/mongodb";
 import { getTasksCollection } from "@/lib/db/models/Task";
+import { getUsersCollection } from "@/lib/db/models/User";
 import { taskUpdateSchema } from "@/lib/validators/task";
 import { invalidateCache } from "@/lib/redis/ratelimit";
 import type { Task } from "@/types/task";
@@ -10,6 +11,7 @@ import { normalizeTask } from "@/lib/tasks/normalize";
 import { cancelTaskDeliveries } from "@/lib/reminders/cancelTaskDeliveries";
 import { validateTaskDependencies } from "@/lib/tasks/dependencies";
 import { trackEvent } from "@/lib/analytics/events";
+import { buildCalendarComposeLink } from "@/lib/calendar/link";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -69,6 +71,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (updateFields.dueDate === "") {
     delete updateFields.dueDate;
     unsetFields.dueDate = "";
+    unsetFields.calendarLink = "";
   }
   if (updateFields.reminderAt === "") {
     delete updateFields.reminderAt;
@@ -78,10 +81,12 @@ export async function PATCH(request: Request, { params }: Params) {
   try {
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
+    const existing = await tasks.findOne({ _id: new ObjectId(id), createdBy: auth.user.id }, { projection: { status: 1, priority: 1, title: 1, durationMinutes: 1 } });
     if (updateFields.dependencies) {
       const dependencyError = await validateTaskDependencies(tasks, auth.user.id, id, updateFields.dependencies);
       if (dependencyError) return NextResponse.json({ error: dependencyError }, { status: 400 });
     }
+    if ((updateFields.dueDate || updateFields.reminderAt) && !updateFields.calendarLink && existing) updateFields.calendarLink = buildCalendarComposeLink(existing.title, updateFields.dueDate || updateFields.reminderAt, updateFields.durationMinutes ?? existing.durationMinutes);
     if (typeof updateFields.delegatedTo === "string" || typeof updateFields.delegatedPhone === "string") updateFields.delegationStatus = "pending";
     if (unsetFields.delegatedTo && unsetFields.delegatedPhone) updateFields.delegationStatus = "none";
     const result = await tasks.findOneAndUpdate(
@@ -94,7 +99,15 @@ export async function PATCH(request: Request, { params }: Params) {
     );
 
     if (!result) return NextResponse.json({ error: "Task not found" }, { status: 404 });
-    if (result.status === "completed") await trackEvent(db, auth.user.id, "task_completed");
+    const newlyCompleted = existing?.status !== "completed" && result.status === "completed";
+    if (newlyCompleted) {
+      await trackEvent(db, auth.user.id, "task_completed");
+      const users = await getUsersCollection(db);
+      await users.updateOne(
+        { _id: new ObjectId(auth.user.id) },
+        { $inc: { "behaviorProfile.completedTaskCount": 1, "behaviorProfile.highPriorityCompletedCount": existing?.priority === "high" || existing?.priority === "urgent" ? 1 : 0 }, $set: { "behaviorProfile.updatedAt": new Date().toISOString() } },
+      );
+    }
     if (result.status === "completed" || result.status === "cancelled") {
       await cancelTaskDeliveries(db, id, auth.user.id);
     }

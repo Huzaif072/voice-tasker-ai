@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { delegationSchema } from "@/lib/validators/delegation";
 import { taskSchema } from "@/lib/validators/task";
 import { basicRegexIntent } from "@/lib/groq/intent-parser";
-import { suggestPriority } from "@/lib/tasks/prioritize";
+import { suggestDeadline, suggestPriority } from "@/lib/tasks/prioritize";
+import { buildCalendarComposeLink } from "@/lib/calendar/link";
+import { feedbackInputSchema } from "@/lib/validators/ai";
 import { decryptSecret, encryptSecret } from "@/lib/auth/secrets";
 import type { Task } from "@/types/task";
 
@@ -40,6 +42,11 @@ const task: Task = {
   updatedAt: new Date().toISOString(),
 };
 assert.equal(suggestPriority(task, [task]).priority, "urgent");
+const deadline = suggestDeadline({ ...task, dueDate: undefined, priority: "high" });
+assert.equal(typeof deadline.dueDate, "string");
+assert.match(buildCalendarComposeLink("Review report", new Date().toISOString()) ?? "", /^https:\/\/calendar\.google\.com\/calendar\/render\?/);
+assert.equal(feedbackInputSchema.safeParse({ category: "voice", rating: "positive" }).success, true);
+assert.equal(feedbackInputSchema.safeParse({ category: "voice", rating: "maybe" }).success, false);
 
 const encrypted = encryptSecret("calendar-token");
 assert.equal(decryptSecret(encrypted), "calendar-token");

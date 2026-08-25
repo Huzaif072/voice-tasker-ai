@@ -8,7 +8,10 @@ let indexesPromise: Promise<void> | null = null;
 export async function getVoiceSessionsCollection(db: Db): Promise<Collection<VoiceSessionDocument>> {
   const col = db.collection<VoiceSessionDocument>(VOICE_SESSIONS_COLLECTION);
   if (!indexesPromise) {
-    indexesPromise = col.createIndex({ userId: 1, timestamp: -1 }).then(() => undefined).catch((error) => { indexesPromise = null; throw error; });
+    indexesPromise = Promise.all([
+      col.createIndex({ userId: 1, timestamp: -1 }),
+      col.createIndex({ userId: 1, conversationId: 1, timestamp: -1 }),
+    ]).then(() => undefined).catch((error) => { indexesPromise = null; throw error; });
   }
   await indexesPromise;
   return col;

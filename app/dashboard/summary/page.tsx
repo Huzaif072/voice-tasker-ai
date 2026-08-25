@@ -6,6 +6,7 @@ import { SummaryCard } from "@/components/ai/SummaryCard";
 import { Button } from "@/components/ui/Button";
 import { useAI } from "@/hooks/useAI";
 import { speakText, stopSpeaking } from "@/lib/voice/speak";
+import { FeedbackButtons } from "@/components/ai/FeedbackButtons";
 
 export default function SummaryPage() {
   const { useSummary } = useAI();
@@ -23,6 +24,7 @@ export default function SummaryPage() {
         </div>
       </div>
       <SummaryCard summary={summary.data?.summary ?? ""} period={period} loading={summary.isLoading} />
+      {summary.data?.summary ? <div className="mt-3 flex justify-end"><FeedbackButtons category="summary" /></div> : null}
       {summary.isError ? <p role="alert" className="mt-4 text-sm text-red-400">Unable to load the briefing. Please try again.</p> : null}
     </motion.div>
   );

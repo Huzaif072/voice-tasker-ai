@@ -76,6 +76,13 @@ export default function TasksPage() {
               updateTask.reset();
               setEditingTask(task);
             }}
+            onReschedule={(id) => {
+              if (updateTask.isPending) return;
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              tomorrow.setHours(9, 0, 0, 0);
+              updateTask.mutate({ id, dueDate: tomorrow.toISOString() });
+            }}
             onToggle={(id) => {
               if (updateTask.isPending) return;
               const task = tasks.find((item) => item._id === id);

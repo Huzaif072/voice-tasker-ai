@@ -30,6 +30,7 @@ export interface Task {
   reminderAt?: string;
   durationMinutes?: number;
   calendarQuery?: string;
+  calendarLink?: string;
   subtasks: Subtask[];
   dependencies: string[];
   contextTriggers: ContextTrigger[];

@@ -15,6 +15,7 @@ const dueDateSchema = z.string().datetime().or(z.literal(""));
 const reminderAtSchema = z.string().datetime().or(z.literal(""));
 const durationMinutesSchema = z.number().int().min(1).max(24 * 60).optional();
 const calendarQuerySchema = z.string().trim().max(200).or(z.literal(""));
+const calendarLinkSchema = z.string().url().max(1000).or(z.literal(""));
 const delegatedToSchema = z.string().trim().toLowerCase().email().or(z.literal(""));
 const delegatedPhoneSchema = z.string().trim().regex(/^\+[1-9]\d{7,14}$/, "Phone must use international E.164 format").or(z.literal(""));
 const dependencySchema = z.string().trim().regex(/^[a-f0-9]{24}$/i, "Invalid dependency ID");
@@ -52,6 +53,7 @@ export const taskSchema = z.object({
   reminderAt: reminderAtSchema.optional(),
   durationMinutes: durationMinutesSchema,
   calendarQuery: calendarQuerySchema.optional(),
+  calendarLink: calendarLinkSchema.optional(),
   subtasks: z.array(subtaskSchema).max(100).default([]),
   dependencies: z.array(dependencySchema).max(50).default([]),
   contextTriggers: z.array(contextTriggerSchema).max(20).default([]),
@@ -69,6 +71,7 @@ export const taskUpdateSchema = z.object({
   reminderAt: reminderAtSchema.optional(),
   durationMinutes: durationMinutesSchema,
   calendarQuery: calendarQuerySchema.optional(),
+  calendarLink: calendarLinkSchema.optional(),
   subtasks: z.array(subtaskSchema).max(100).optional(),
   dependencies: z.array(dependencySchema).max(50).optional(),
   contextTriggers: z.array(contextTriggerSchema).max(20).optional(),

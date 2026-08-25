@@ -12,6 +12,7 @@ import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import Link from "next/link";
 import { DashboardSearchProvider } from "@/hooks/useDashboardSearch";
 import { useContextLocation } from "@/hooks/useContextLocation";
+import { PwaStatus } from "@/components/dashboard/PwaStatus";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -32,6 +33,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </DashboardSearchProvider>
       </div>
 
+      <PwaStatus />
       <div className="fixed bottom-4 right-4 z-50 md:bottom-8 md:right-8">
         <Link href="/dashboard/voice" aria-label="Open voice assistant">
           <VoiceMicButton

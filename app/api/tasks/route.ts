@@ -10,6 +10,7 @@ import { normalizeTask } from "@/lib/tasks/normalize";
 import { buildTaskFilter, taskCacheKey, taskQuerySchema } from "@/lib/tasks/query";
 import { validateTaskDependencies } from "@/lib/tasks/dependencies";
 import { trackEvent } from "@/lib/analytics/events";
+import { buildCalendarComposeLink } from "@/lib/calendar/link";
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
@@ -32,7 +33,13 @@ export async function GET(request: Request) {
     const filter = buildTaskFilter(auth.user.id, query);
     const skip = (query.page - 1) * query.limit;
     const [results, total] = await Promise.all([
-      tasks.find(filter).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(query.limit).toArray(),
+      tasks.aggregate([
+        { $match: filter },
+        { $addFields: { _priorityRank: { $switch: { branches: [{ case: { $eq: ["$priority", "urgent"] }, then: 4 }, { case: { $eq: ["$priority", "high"] }, then: 3 }, { case: { $eq: ["$priority", "medium"] }, then: 2 }, { case: { $eq: ["$priority", "low"] }, then: 1 }], default: 2 } }, _dueDateSort: { $cond: [{ $or: [{ $eq: ["$dueDate", null] }, { $eq: ["$dueDate", ""] }] }, "9999-12-31T23:59:59.999Z", "$dueDate"] } } },
+        { $sort: { _priorityRank: -1, _dueDateSort: 1, createdAt: -1, _id: -1 } },
+        { $skip: skip },
+        { $limit: query.limit },
+      ]).toArray(),
       tasks.countDocuments(filter),
     ]);
     const serialized = results.map((t) =>
@@ -82,6 +89,7 @@ export async function POST(request: Request) {
 
     const taskDoc = {
       ...parsed.data,
+      calendarLink: buildCalendarComposeLink(parsed.data.title, parsed.data.dueDate || parsed.data.reminderAt, parsed.data.durationMinutes),
       dueDate: parsed.data.dueDate || undefined,
       reminderAt: parsed.data.reminderAt || undefined,
       dependencies: parsed.data.dependencies,

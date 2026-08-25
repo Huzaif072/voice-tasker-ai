@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Trash2, Check, Pencil } from "lucide-react";
+import { Trash2, Check, Pencil, CalendarClock, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { formatRelativeDate } from "@/lib/utils/date";
 import { priorityConfig } from "@/lib/utils/priority";
@@ -13,9 +13,10 @@ interface TaskCardProps {
   onToggle?: (id: string) => void;
   onDelete?: (id: string) => void;
   onEdit?: (task: Task) => void;
+  onReschedule?: (id: string) => void;
 }
 
-export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
+export function TaskCard({ task, onToggle, onDelete, onEdit, onReschedule }: TaskCardProps) {
   const priority = priorityConfig[task.priority] ?? priorityConfig.medium;
   const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
   const tags = Array.isArray(task.tags) ? task.tags : [];
@@ -56,6 +57,7 @@ export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
           <p className="mt-1 text-sm text-slate-400 line-clamp-2">{task.description}</p>
         ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+          {task.calendarLink ? <a href={task.calendarLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-violet-300 hover:text-violet-200"><ExternalLink className="h-3 w-3" />Calendar</a> : null}
           {task.dueDate ? <span>Due {formatRelativeDate(task.dueDate)}</span> : null}
           {subtasks.length > 0 ? (
             <span>
@@ -70,6 +72,9 @@ export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
           ))}
         </div>
       </div>
+
+      {onReschedule && task._id && !isCompleted ? <button type="button" onClick={() => onReschedule(task._id!)} className="opacity-70 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 text-slate-500 hover:text-violet-300" aria-label={`Reschedule ${task.title} to tomorrow`}
+><CalendarClock className="h-4 w-4" /></button> : null}
 
       {onEdit && task._id ? (
         <button

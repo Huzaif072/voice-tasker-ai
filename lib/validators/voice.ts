@@ -12,6 +12,7 @@ export const voiceInputSchema = z
     mimeType: audioMimeType.optional(),
     confirm: z.boolean().optional(),
     confirmationToken: z.string().max(512).optional(),
+    conversationId: z.string().trim().regex(/^[a-zA-Z0-9_-]{8,100}$/, "Invalid conversation ID").optional(),
   })
   .refine((value) => Boolean(value.text) !== Boolean(value.audio), {
     message: "Provide exactly one of text or audio input",

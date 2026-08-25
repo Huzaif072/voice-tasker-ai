@@ -18,6 +18,12 @@ export interface LinkedProvider {
   linkedAt: string;
 }
 
+export interface BehaviorProfile {
+  completedTaskCount: number;
+  highPriorityCompletedCount: number;
+  updatedAt: string;
+}
+
 export interface User {
   _id?: string;
   name: string;
@@ -37,6 +43,7 @@ export interface User {
   pushSubscription?: unknown;
   pushSubscriptionUpdatedAt?: string;
   reminderSettings?: ReminderSettings;
+  behaviorProfile?: BehaviorProfile;
   googleCalendarAccessToken?: string;
   googleCalendarRefreshToken?: string;
   googleCalendarExpiresAt?: string;

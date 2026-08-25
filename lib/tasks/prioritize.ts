@@ -1,8 +1,9 @@
 import type { Task, TaskPriority } from "@/types/task";
+import type { BehaviorProfile } from "@/types/user";
 
 const priorityWeight: Record<TaskPriority, number> = { low: 1, medium: 2, high: 3, urgent: 4 };
 
-export function suggestPriority(task: Task, history: Task[], now = new Date()): { priority: TaskPriority; reasons: string[] } {
+export function suggestPriority(task: Task, history: Task[], now = new Date(), profile?: BehaviorProfile): { priority: TaskPriority; reasons: string[] } {
   let score = priorityWeight[task.priority] ?? 2;
   const reasons: string[] = [];
   if (task.dueDate) {
@@ -22,6 +23,16 @@ export function suggestPriority(task: Task, history: Task[], now = new Date()): 
     score += 1;
     reasons.push("similar tasks are frequently completed at high priority");
   }
+  if (profile && profile.completedTaskCount >= 5 && profile.highPriorityCompletedCount / profile.completedTaskCount >= 0.6 && priorityWeight[task.priority] < priorityWeight.high) {
+    score += 1;
+    reasons.push("your completed tasks are usually high priority");
+  }
   const priority = score >= 6 ? "urgent" : score >= 4 ? "high" : score <= 1 ? "low" : "medium";
   return { priority, reasons };
+}
+
+export function suggestDeadline(task: Task, now = new Date()): { dueDate?: string; reason?: string } {
+  if (task.dueDate || task.status === "completed" || task.status === "cancelled") return {};
+  const offsetHours = task.priority === "urgent" ? 24 : task.priority === "high" ? 72 : task.priority === "medium" ? 7 * 24 : 14 * 24;
+  return { dueDate: new Date(now.getTime() + offsetHours * 3_600_000).toISOString(), reason: `suggested from ${task.priority} priority` };
 }

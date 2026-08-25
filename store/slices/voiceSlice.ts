@@ -10,6 +10,9 @@ interface VoiceState {
   parsedIntent: (ParsedIntent & { confidence: number }) | null;
   queryResults: Task[];
   history: VoiceSession[];
+  followUpPrompts: string[];
+  conversationId: string | null;
+  calendarLink: string | null;
   error: string | null;
 }
 
@@ -21,6 +24,9 @@ const initialState: VoiceState = {
   parsedIntent: null,
   queryResults: [],
   history: [],
+  followUpPrompts: [],
+  conversationId: null,
+  calendarLink: null,
   error: null,
 };
 
@@ -36,10 +42,14 @@ const voiceSlice = createSlice({
     setParsedIntent(state, action: PayloadAction<(ParsedIntent & { confidence: number }) | null>) { state.parsedIntent = action.payload; },
     setQueryResults(state, action: PayloadAction<Task[]>) { state.queryResults = action.payload; },
     setHistory(state, action: PayloadAction<VoiceSession[]>) { state.history = action.payload; },
+    setFollowUpPrompts(state, action: PayloadAction<string[]>) { state.followUpPrompts = action.payload; },
+    setConversationId(state, action: PayloadAction<string | null>) { state.conversationId = action.payload; },
+    setCalendarLink(state, action: PayloadAction<string | null>) { state.calendarLink = action.payload; },
     setVoiceError(state, action: PayloadAction<string | null>) { state.error = action.payload; },
-    resetVoice(state) { state.transcript = ""; state.interimTranscript = ""; state.parsedIntent = null; state.queryResults = []; state.error = null; },
+    resetVoice(state) { state.transcript = ""; state.interimTranscript = ""; state.parsedIntent = null; state.queryResults = []; state.followUpPrompts = []; state.calendarLink = null; state.error = null; },
+    newVoiceConversation(state) { state.transcript = ""; state.interimTranscript = ""; state.parsedIntent = null; state.queryResults = []; state.followUpPrompts = []; state.conversationId = null; state.calendarLink = null; state.error = null; },
   },
 });
 
-export const { setRecording, setProcessing, setTranscript, setInterimTranscript, appendTranscript, setParsedIntent, setQueryResults, setHistory, setVoiceError, resetVoice } = voiceSlice.actions;
+export const { setRecording, setProcessing, setTranscript, setInterimTranscript, appendTranscript, setParsedIntent, setQueryResults, setHistory, setFollowUpPrompts, setConversationId, setCalendarLink, setVoiceError, resetVoice, newVoiceConversation } = voiceSlice.actions;
 export default voiceSlice.reducer;
