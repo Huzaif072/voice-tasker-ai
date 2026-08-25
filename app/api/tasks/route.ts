@@ -61,10 +61,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
     const parsed = taskSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid task" }, { status: 400 });
     }
 
     const db = await connectWithRetry();
@@ -88,7 +93,8 @@ export async function POST(request: Request) {
       { task: normalizeTask({ ...taskDoc, _id: result.insertedId.toString() }) },
       { status: 201 }
     );
-  } catch {
-    return NextResponse.json({ error: "Failed to create task" }, { status: 500 });
+  } catch (error) {
+    console.error("Task creation error:", error);
+    return NextResponse.json({ error: "Failed to create task" }, { status: 503 });
   }
 }

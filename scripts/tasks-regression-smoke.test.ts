@@ -50,6 +50,15 @@ const editableTask = taskUpdateSchema.safeParse({
   subtasks: [{ id: "subtask-1", title: "Review details", completed: false }],
 });
 if (!editableTask.success) throw new Error("Task detail edits should accept supported metadata and subtasks");
+if (taskUpdateSchema.safeParse({}).success) throw new Error("Empty task updates should be rejected");
+if (taskUpdateSchema.safeParse({ title: "   " }).success) throw new Error("Whitespace-only task titles should be rejected");
+if (taskUpdateSchema.safeParse({ subtasks: [{ id: "x", title: "", completed: false }] }).success) {
+  throw new Error("Empty subtask titles should be rejected");
+}
+const clearDelegation = taskUpdateSchema.safeParse({ delegatedTo: "" });
+if (!clearDelegation.success || clearDelegation.data.delegatedTo !== "") {
+  throw new Error("Task updates should allow explicitly clearing delegation");
+}
 
 const parsedQuery = taskQuerySchema.safeParse({ page: "2", limit: "25", search: "quarterly", active: "false" });
 if (!parsedQuery.success || parsedQuery.data.page !== 2 || parsedQuery.data.limit !== 25 || parsedQuery.data.active) {

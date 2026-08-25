@@ -1,25 +1,43 @@
 import { z } from "zod";
 
-export const taskSchema = z.object({
-  title: z.string().min(1, "Title is required").max(500),
-  description: z.string().max(5000).optional(),
-  status: z.enum(["pending", "in_progress", "completed", "cancelled"]).default("pending"),
-  priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
-  dueDate: z.string().datetime().optional().or(z.literal("")),
-  subtasks: z
-    .array(
-      z.object({
-        id: z.string(),
-        title: z.string(),
-        completed: z.boolean(),
-      })
-    )
-    .default([]),
-  tags: z.array(z.string()).default([]),
-  delegatedTo: z.string().email().optional(),
+const subtaskSchema = z.object({
+  id: z.string().trim().min(1).max(100),
+  title: z.string().trim().min(1, "Subtask title is required").max(500),
+  completed: z.boolean(),
 });
 
-export const taskUpdateSchema = taskSchema.partial();
+const tagSchema = z.string().trim().min(1, "Tags cannot be empty").max(50);
+const titleSchema = z.string().trim().min(1, "Title is required").max(500);
+const descriptionSchema = z.string().trim().max(5000);
+const statusSchema = z.enum(["pending", "in_progress", "completed", "cancelled"]);
+const prioritySchema = z.enum(["low", "medium", "high", "urgent"]);
+const dueDateSchema = z.string().datetime().or(z.literal(""));
+const delegatedToSchema = z.string().trim().toLowerCase().email().or(z.literal(""));
+
+export const taskSchema = z.object({
+  title: titleSchema,
+  description: descriptionSchema.optional(),
+  status: statusSchema.default("pending"),
+  priority: prioritySchema.default("medium"),
+  dueDate: dueDateSchema.optional(),
+  subtasks: z.array(subtaskSchema).max(100).default([]),
+  tags: z.array(tagSchema).max(50).default([]),
+  delegatedTo: delegatedToSchema.optional(),
+});
+
+export const taskUpdateSchema = z.object({
+  title: titleSchema.optional(),
+  description: descriptionSchema.optional(),
+  status: statusSchema.optional(),
+  priority: prioritySchema.optional(),
+  dueDate: dueDateSchema.optional(),
+  subtasks: z.array(subtaskSchema).max(100).optional(),
+  tags: z.array(tagSchema).max(50).optional(),
+  delegatedTo: delegatedToSchema.optional(),
+}).refine(
+  (value) => Object.keys(value).length > 0,
+  "At least one task field is required"
+);
 
 export type TaskInput = z.infer<typeof taskSchema>;
 export type TaskUpdateInput = z.infer<typeof taskUpdateSchema>;
