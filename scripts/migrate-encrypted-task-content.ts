@@ -1,11 +1,32 @@
-import { connectWithRetry } from "@/lib/db/mongodb";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { getTasksCollection } from "@/lib/db/models/Task";
 import { encryptTaskDocument, ENCRYPTED_TASK_FIELDS } from "@/lib/privacy/taskEncryption";
 import { getReminderDeliveriesCollection } from "@/lib/db/models/ReminderDelivery";
 import { encryptUserJson, encryptUserText } from "@/lib/privacy/fieldEncryption";
 import { getUsersCollection } from "@/lib/db/models/User";
 
+function loadLocalEnvironment() {
+  for (const filename of [".env.local", ".env"]) {
+    const path = join(process.cwd(), filename);
+    if (!existsSync(path)) continue;
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const separator = trimmed.indexOf("=");
+      if (separator <= 0) continue;
+      const key = trimmed.slice(0, separator).trim();
+      let value = trimmed.slice(separator + 1).trim();
+      if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+      if (process.env[key] === undefined) process.env[key] = value;
+    }
+    break;
+  }
+}
+
 async function main() {
+  loadLocalEnvironment();
+  const { connectWithRetry } = await import("@/lib/db/mongodb");
   const db = await connectWithRetry();
   const tasks = await getTasksCollection(db);
   let migrated = 0;
