@@ -42,15 +42,33 @@ export function useSocket(userId?: string) {
     }
     let socket: import("socket.io-client").Socket | null = null;
     let cancelled = false;
-    import("socket.io-client").then(({ io }) => {
+    async function getRealtimeToken() {
+      const response = await fetch("/api/realtime/token", { cache: "no-store" });
+      if (!response.ok) throw new Error("Realtime token unavailable");
+      const data = await response.json() as { token?: string };
+      if (!data.token) throw new Error("Realtime token unavailable");
+      return data.token;
+    }
+    void import("socket.io-client").then(async ({ io }) => {
       if (cancelled) return;
-      socket = io(socketUrl, { auth: { userId }, reconnection: false });
-      connectedRef.current = true;
-      socket.on("connect_error", () => { connectedRef.current = false; socket?.close(); });
-      socket.on(SOCKET_EVENTS.TASK_CREATED, invalidate);
-      socket.on(SOCKET_EVENTS.TASK_UPDATED, invalidate);
-      socket.on(SOCKET_EVENTS.TASK_DELETED, invalidate);
-      socket.on(SOCKET_EVENTS.NOTIFICATION, invalidate);
+      try {
+        const token = await getRealtimeToken();
+        if (cancelled) return;
+        socket = io(socketUrl, { auth: { token }, reconnection: true, reconnectionAttempts: Infinity, transports: ["websocket", "polling"] });
+        socket.on("connect", () => { connectedRef.current = true; });
+        socket.on("disconnect", () => { connectedRef.current = false; });
+        socket.on("connect_error", async () => {
+          connectedRef.current = false;
+          if (cancelled || !socket) return;
+          try { socket.auth = { token: await getRealtimeToken() }; socket.connect(); } catch { socket.close(); }
+        });
+        socket.on(SOCKET_EVENTS.TASK_CREATED, invalidate);
+        socket.on(SOCKET_EVENTS.TASK_UPDATED, invalidate);
+        socket.on(SOCKET_EVENTS.TASK_DELETED, invalidate);
+        socket.on(SOCKET_EVENTS.NOTIFICATION, invalidate);
+      } catch {
+        // The authenticated event-feed fallback remains active when the socket service is unavailable.
+      }
     });
     return () => { cancelled = true; socket?.disconnect(); connectedRef.current = false; window.clearInterval(fallbackPoll); window.removeEventListener("online", onOnline); channel?.close(); };
   }, [userId, qc]);

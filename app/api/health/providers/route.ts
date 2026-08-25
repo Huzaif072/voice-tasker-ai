@@ -17,6 +17,7 @@ export type ProviderHealth = {
   googleCalendar: ProviderStatus;
   twilio: ProviderStatus;
   sentry: ProviderStatus;
+  socket: ProviderStatus;
 };
 
 const PROVIDER_CHECK_TIMEOUT_MS = 2_000;
@@ -36,6 +37,17 @@ async function withTimeout<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
     ]);
   } finally {
     if (timer) clearTimeout(timer);
+  }
+}
+
+async function checkSocket(): Promise<ProviderStatus> {
+  const url = process.env.SOCKET_SERVER_URL?.trim().replace(/\/$/, "");
+  if (!url) return "disabled";
+  try {
+    await withTimeout(fetch(`${url}/healthz`, { cache: "no-store" }).then((response) => { if (!response.ok) throw new Error("socket health failed"); }), PROVIDER_CHECK_TIMEOUT_MS);
+    return "ok";
+  } catch {
+    return "unavailable";
   }
 }
 
@@ -61,11 +73,12 @@ export async function GET(request: Request) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
 
-  const [redis, database] = await Promise.all([
+  const [redis, database, socket] = await Promise.all([
     checkRedis(),
     withTimeout(connectWithRetry(1), PROVIDER_CHECK_TIMEOUT_MS)
       .then((db) => ({ db, status: "ok" as const }))
       .catch(() => ({ db: null, status: "unavailable" as const })),
+    checkSocket(),
   ]);
 
   let calendarStatus: ProviderStatus;
@@ -90,6 +103,7 @@ export async function GET(request: Request) {
     googleCalendar: calendarStatus,
     twilio: configured(process.env.TWILIO_ACCOUNT_SID) && configured(process.env.TWILIO_AUTH_TOKEN) && configured(process.env.TWILIO_FROM_NUMBER) ? "configured" : "unconfigured",
     sentry: configured(process.env.SENTRY_DSN) || configured(process.env.NEXT_PUBLIC_SENTRY_DSN) ? "configured" : "unconfigured",
+    socket,
   };
 
   return createProviderHealthResponse(providers);

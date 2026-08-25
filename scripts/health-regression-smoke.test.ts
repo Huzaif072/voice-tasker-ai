@@ -26,6 +26,7 @@ async function main() {
     googleCalendar: "disabled",
     twilio: "unconfigured",
     sentry: "configured",
+    socket: "disabled",
   };
   const providerResponse = createProviderHealthResponse(providerStatuses);
   const providerBody = await providerResponse.json();

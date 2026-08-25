@@ -19,6 +19,10 @@ export interface JwtPayload {
   sv?: number;
 }
 
+export interface RealtimeJwtPayload extends JwtPayload {
+  purpose: "realtime";
+}
+
 export function signToken(user: AuthUser, expiresIn: SignOptions["expiresIn"] = "7d"): string {
   return jwt.sign(
     {
@@ -35,6 +39,23 @@ export function signToken(user: AuthUser, expiresIn: SignOptions["expiresIn"] = 
       audience: JWT_AUDIENCE,
     }
   );
+}
+
+export function signRealtimeToken(user: AuthUser): string {
+  return jwt.sign(
+    { sub: user.id, email: user.email, name: user.name, sv: user.sessionVersion ?? 0, purpose: "realtime" },
+    getJwtSecret(),
+    { expiresIn: "1h", algorithm: "HS256", issuer: JWT_ISSUER, audience: JWT_AUDIENCE },
+  );
+}
+
+export function verifyRealtimeToken(token: string): RealtimeJwtPayload | null {
+  try {
+    const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"], issuer: JWT_ISSUER, audience: JWT_AUDIENCE }) as RealtimeJwtPayload;
+    return payload.purpose === "realtime" ? payload : null;
+  } catch {
+    return null;
+  }
 }
 
 export function verifyToken(token: string): JwtPayload | null {
