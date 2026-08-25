@@ -26,8 +26,10 @@ class FakeCollection {
     return cursor;
   }
 
-  async findOne() {
-    return this.state.users[0] ?? null;
+  async findOne(filter: Record<string, unknown>) {
+    if (this.name === "users") return this.state.users[0] ?? null;
+    const id = filter._id as ObjectId | undefined;
+    return this.state.tasks.find((task) => !id || task._id?.toString() === id.toString()) ?? null;
   }
 
   async insertOne(document: Record<string, unknown>) {
@@ -126,7 +128,13 @@ async function main() {
   assert.equal(retry.deliveriesClaimed, 1);
   assert.equal(state.deliveries[0].attempts, 2);
   assert.equal(state.deliveries[0].status, "pending");
-  console.log("PASS: reminder worker suppresses duplicate notifications and retries transient outbox failures with backoff.");
+
+  state.tasks[0].status = "completed";
+  state.now = "2026-08-25T12:03:01.000Z";
+  const cancelled = await processDueReminders(db, new Date(state.now));
+  assert.equal(cancelled.deliveriesCancelled, 1);
+  assert.equal(state.deliveries[0].status, "cancelled");
+  console.log("PASS: reminder worker suppresses duplicates, retries transient failures, and cancels delivery after task completion.");
 }
 
 main().catch((error) => {

@@ -44,11 +44,15 @@ export default function SecurityPage() {
   async function saveReminderSettings() {
     setSavingReminders(true);
     setMessage("");
+    const settingsToSave = {
+      ...reminderSettings,
+      channels: reminderSettings.channels.filter((channel) => channel !== "push" || pushStatus === "subscribed"),
+    };
     try {
       const response = await fetch("/api/account/reminders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(reminderSettings),
+        body: JSON.stringify(settingsToSave),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Unable to update reminder settings");
@@ -62,6 +66,10 @@ export default function SecurityPage() {
   }
 
   function toggleReminderChannel(channel: ReminderChannel) {
+    if (channel === "push" && pushStatus !== "subscribed") {
+      setMessage("Enable browser push before selecting push reminders.");
+      return;
+    }
     setReminderSettings((current) => {
       const channels = current.channels.includes(channel)
         ? current.channels.filter((item) => item !== channel)
@@ -167,8 +175,9 @@ export default function SecurityPage() {
         <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-300">
           {(["in_app", "email", "push"] as ReminderChannel[]).map((channel) => (
             <label key={channel} className="flex items-center gap-2">
-              <input type="checkbox" checked={reminderSettings.channels.includes(channel)} disabled={channel === "in_app"} onChange={() => toggleReminderChannel(channel)} className="h-4 w-4 accent-violet-500" />
+              <input type="checkbox" checked={reminderSettings.channels.includes(channel) && (channel !== "push" || pushStatus === "subscribed")} disabled={channel === "in_app" || (channel === "push" && pushStatus !== "subscribed")} onChange={() => toggleReminderChannel(channel)} className="h-4 w-4 accent-violet-500" />
               <span className="capitalize">{channel.replace("_", " ")}</span>
+              {channel === "push" && pushStatus !== "subscribed" ? <span className="text-xs text-slate-500">Enable browser push first</span> : null}
             </label>
           ))}
         </div>

@@ -4,6 +4,15 @@ export interface PushDeliveryResult {
   error?: string;
 }
 
+export function classifyPushFailure(error: unknown): PushDeliveryResult {
+  const statusCode = (error as { statusCode?: number }).statusCode;
+  return {
+    ok: false,
+    permanentFailure: statusCode === 404 || statusCode === 410,
+    error: statusCode ? `Push provider returned HTTP ${statusCode}` : "Push provider rejected the notification",
+  };
+}
+
 export async function sendPushNotificationResult(
   subscription: unknown,
   payload: { title: string; body: string; url?: string },
@@ -22,12 +31,7 @@ export async function sendPushNotificationResult(
     await webpush.sendNotification(subscription as never, JSON.stringify(payload));
     return { ok: true, permanentFailure: false };
   } catch (error) {
-    const statusCode = (error as { statusCode?: number }).statusCode;
-    return {
-      ok: false,
-      permanentFailure: statusCode === 404 || statusCode === 410,
-      error: statusCode ? `Push provider returned HTTP ${statusCode}` : "Push provider rejected the notification",
-    };
+    return classifyPushFailure(error);
   }
 }
 

@@ -3,7 +3,7 @@ import { getTasksCollection } from "@/lib/db/models/Task";
 import { getNotificationsCollection } from "@/lib/db/models/Notification";
 import { getUsersCollection, defaultReminderSettings, type UserDocument } from "@/lib/db/models/User";
 import { getReminderDeliveriesCollection, type ReminderDeliveryDocument } from "@/lib/db/models/ReminderDelivery";
-import { sendEmail } from "@/lib/notifications/email";
+import { sendEmailResult } from "@/lib/notifications/email";
 import { sendPushNotificationResult } from "@/lib/notifications/push";
 
 const MAX_REMINDERS_PER_RUN = 100;
@@ -18,6 +18,7 @@ export interface ReminderRunResult {
   deliveriesClaimed: number;
   deliveriesSent: number;
   deliveriesFailed: number;
+  deliveriesCancelled: number;
 }
 
 function escapeHtml(value: string): string {
@@ -103,12 +104,12 @@ async function deliver(
 ): Promise<{ sent: boolean; permanentFailure: boolean; error?: string }> {
   if (!user) return { sent: false, permanentFailure: true, error: "Owner account no longer exists" };
   if (delivery.channel === "email" && user.email) {
-    const sent = await sendEmail({
+    const result = await sendEmailResult({
       to: user.email,
       subject: `Reminder: ${delivery.taskTitle}`,
       html: `<p>You asked to be reminded about <strong>${escapeHtml(delivery.taskTitle)}</strong>.</p>`,
     });
-    return { sent, permanentFailure: false, error: sent ? undefined : "Email provider rejected the notification" };
+    return { sent: result.ok, permanentFailure: result.permanentFailure, error: result.error };
   }
   if (delivery.channel === "push" && user.pushSubscription) {
     const result = await sendPushNotificationResult(user.pushSubscription, {
@@ -171,10 +172,24 @@ export async function processDueReminders(db: Db, now = new Date()): Promise<Rem
   let deliveriesClaimed = 0;
   let deliveriesSent = 0;
   let deliveriesFailed = 0;
+  let deliveriesCancelled = 0;
   for (let index = 0; index < MAX_DELIVERIES_PER_RUN; index += 1) {
     const delivery = await claimDelivery(deliveries, now);
     if (!delivery) break;
     deliveriesClaimed += 1;
+    const updatedAt = now.toISOString();
+    const deliveryTaskId = userObjectId(delivery.taskId);
+    const latestTask = deliveryTaskId
+      ? await tasks.findOne({ _id: deliveryTaskId, createdBy: delivery.userId }, { projection: { status: 1 } })
+      : null;
+    if (!latestTask || latestTask.status === "completed" || latestTask.status === "cancelled") {
+      deliveriesCancelled += 1;
+      await deliveries.updateOne(
+        { _id: delivery._id, status: "sending" },
+        { $set: { status: "cancelled", lastError: "Task is no longer active", updatedAt, expiresAt: new Date(now.getTime() + DELIVERY_RETENTION_MS) }, $unset: { leaseUntil: "" } },
+      );
+      continue;
+    }
     let deliveryUser = userById.get(delivery.userId) as UserDocument | undefined;
     if (!deliveryUser) {
       const id = userObjectId(delivery.userId);
@@ -184,7 +199,6 @@ export async function processDueReminders(db: Db, now = new Date()): Promise<Rem
       }
     }
     const outcome = await deliver(delivery, deliveryUser);
-    const updatedAt = now.toISOString();
     if (outcome.sent) {
       deliveriesSent += 1;
       await deliveries.updateOne(
@@ -209,5 +223,5 @@ export async function processDueReminders(db: Db, now = new Date()): Promise<Rem
     }
   }
 
-  return { scanned: dueTasks.length, created, deliveriesClaimed, deliveriesSent, deliveriesFailed };
+  return { scanned: dueTasks.length, created, deliveriesClaimed, deliveriesSent, deliveriesFailed, deliveriesCancelled };
 }

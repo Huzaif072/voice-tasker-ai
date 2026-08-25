@@ -1,7 +1,7 @@
 import type { Collection, Db, ObjectId } from "mongodb";
 
 export type ReminderDeliveryChannel = "email" | "push";
-export type ReminderDeliveryStatus = "pending" | "sending" | "sent" | "failed";
+export type ReminderDeliveryStatus = "pending" | "sending" | "sent" | "failed" | "cancelled";
 
 export interface ReminderDeliveryDocument {
   _id?: ObjectId;

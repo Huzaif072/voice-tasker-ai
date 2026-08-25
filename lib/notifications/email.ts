@@ -1,17 +1,34 @@
 import nodemailer from "nodemailer";
 
-export async function sendEmail(options: {
+export interface EmailDeliveryResult {
+  ok: boolean;
+  permanentFailure: boolean;
+  error?: string;
+}
+
+export function classifyEmailFailure(error: unknown): EmailDeliveryResult {
+  const responseCode = (error as { responseCode?: number }).responseCode;
+  const response = String((error as { response?: unknown }).response ?? "");
+  const permanentFailure = [550, 551, 552, 553].includes(responseCode ?? 0) || /5\.1\.[12]/.test(response);
+  return {
+    ok: false,
+    permanentFailure,
+    error: permanentFailure ? "Email recipient was rejected" : "Email provider rejected the notification",
+  };
+}
+
+export async function sendEmailResult(options: {
   to: string;
   subject: string;
   html: string;
-}): Promise<boolean> {
+}): Promise<EmailDeliveryResult> {
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   const from = process.env.EMAIL_FROM ?? user;
 
-  if (!host || !user || !pass || !from) return false;
+  if (!host || !user || !pass || !from) return { ok: false, permanentFailure: false, error: "Email delivery is not configured" };
 
   let transporter: ReturnType<typeof nodemailer.createTransport> | undefined;
   try {
@@ -39,12 +56,21 @@ export async function sendEmail(options: {
       }),
       timeout,
     ]);
-    return true;
-  } catch {
-    return false;
+    return { ok: true, permanentFailure: false };
+  } catch (error) {
+    return classifyEmailFailure(error);
   } finally {
     transporter?.close();
   }
+}
+
+export async function sendEmail(options: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<boolean> {
+  const result = await sendEmailResult(options);
+  return result.ok;
 }
 
 function escapeHtml(value: string) {

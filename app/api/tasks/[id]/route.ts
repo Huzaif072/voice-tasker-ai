@@ -7,6 +7,7 @@ import { taskUpdateSchema } from "@/lib/validators/task";
 import { invalidateCache } from "@/lib/redis/ratelimit";
 import type { Task } from "@/types/task";
 import { normalizeTask } from "@/lib/tasks/normalize";
+import { cancelTaskDeliveries } from "@/lib/reminders/cancelTaskDeliveries";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -81,6 +82,9 @@ export async function PATCH(request: Request, { params }: Params) {
     );
 
     if (!result) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    if (result.status === "completed" || result.status === "cancelled") {
+      await cancelTaskDeliveries(db, id, auth.user.id);
+    }
     await invalidateCache(`tasks:${auth.user.id}:*`);
     await invalidateCache(`ai-summary:${auth.user.id}:*`);
 
@@ -109,6 +113,7 @@ export async function DELETE(request: Request, { params }: Params) {
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
+    await cancelTaskDeliveries(db, id, auth.user.id);
 
     await invalidateCache(`tasks:${auth.user.id}:*`);
     await invalidateCache(`ai-summary:${auth.user.id}:*`);
