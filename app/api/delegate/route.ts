@@ -7,6 +7,8 @@ import { sendDelegationEmail } from "@/lib/notifications/email";
 import { sendSms } from "@/lib/notifications/sms";
 import { delegationSchema } from "@/lib/validators/delegation";
 import { checkDelegationRateLimit, getRetryAfterSeconds } from "@/lib/auth/rate-limit";
+import { createAssignmentNotification, findAssignableUser } from "@/lib/tasks/assignments";
+import { recordRealtimeEvent } from "@/lib/realtime/events";
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
     const task = await tasks.findOne(taskFilter);
 
     if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    const recipient = await findAssignableUser(db, email);
 
     const updated = await tasks.updateOne(
       taskFilter,
@@ -53,13 +56,20 @@ export async function POST(request: Request) {
         $set: {
           ...(email ? { delegatedTo: email } : {}),
           ...(phone ? { delegatedPhone: phone } : {}),
+          ...(recipient?._id ? { assigneeUserId: recipient._id.toString(), assignmentStatus: "pending" as const } : { assignmentStatus: "none" as const }),
           delegationStatus: "pending",
           updatedAt: new Date().toISOString(),
         },
+        ...(recipient?._id ? {} : { $unset: { assigneeUserId: "" } }),
       }
     );
     if (updated.matchedCount === 0) {
       return NextResponse.json({ error: "Task could not be updated" }, { status: 409 });
+    }
+    await recordRealtimeEvent(db, auth.user.id, "task_updated", taskId);
+    if (recipient?._id) {
+      await createAssignmentNotification(db, recipient._id.toString(), taskId, task.title, auth.user.name);
+      await recordRealtimeEvent(db, recipient._id.toString(), "assignment_changed", taskId);
     }
 
     const emailSent = email ? await sendDelegationEmail(email, task.title, auth.user.name) : false;
@@ -74,6 +84,7 @@ export async function POST(request: Request) {
       success: true,
       pending: !delivered,
       channels: { email: emailSent, sms: smsResult.sent },
+      assignment: recipient?._id ? { status: "pending", recipientUserId: recipient._id.toString() } : null,
       message: delivered ? "Delegation delivered" : "Task saved as a failed delegation for retry",
     });
   } catch (error) {

@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils/classnames";
 
-const filters = ["All", "Active", "Completed", "High Priority"] as const;
+const filters = ["All", "Active", "Completed", "High Priority", "Assigned to me"] as const;
 export type TaskFilter = (typeof filters)[number];
 
 interface TaskFiltersProps {

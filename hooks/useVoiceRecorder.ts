@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useDispatch } from "react-redux";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,6 +20,10 @@ import {
 import { useToast } from "@/components/ui/Toast";
 import type { ParsedIntent } from "@/types/voice";
 import { speakText } from "@/lib/voice/speak";
+
+function subscribeToMediaSupport() { return () => undefined; }
+function getMediaSupportSnapshot() { return Boolean(navigator.mediaDevices?.getUserMedia); }
+function getServerMediaSupportSnapshot() { return false; }
 
 interface VoiceResponse {
   transcript?: string;
@@ -46,9 +50,9 @@ export function useVoiceRecorder() {
   const lastCommandRef = useRef<string | null>(null);
   const confirmationTokenRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
-  const [supported, setSupported] = useState(
-    () => typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia)
-  );
+  const mediaSupported = useSyncExternalStore(subscribeToMediaSupport, getMediaSupportSnapshot, getServerMediaSupportSnapshot);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const supported = mediaSupported && !permissionDenied;
 
   const handleVoiceResponse = useCallback(
     (data: VoiceResponse) => {
@@ -84,17 +88,12 @@ export function useVoiceRecorder() {
       requestRef.current = controller;
       dispatch(setProcessing(true));
       try {
-        const reader = new FileReader();
-        const base64 = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve((reader.result as string).split(",")[1]);
-          reader.onerror = () => reject(new Error("Unable to read audio"));
-          reader.readAsDataURL(blob);
-        });
-
+        const form = new FormData();
+        form.append("audio", blob, `voice-command.${(blob.type || "audio/webm").split("/")[1]?.split(";")[0] ?? "webm"}`);
+        if (conversationIdRef.current) form.append("conversationId", conversationIdRef.current);
         const res = await fetch("/api/voice/input", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ audio: base64, mimeType: blob.type || "audio/webm", conversationId: conversationIdRef.current ?? undefined }),
+          body: form,
           signal: controller.signal,
         });
         const data = await res.json();
@@ -132,7 +131,7 @@ export function useVoiceRecorder() {
       dispatch(setRecording(true));
     } catch {
       dispatch(setVoiceError("Microphone permission denied. Use text input instead."));
-      setSupported(false);
+      setPermissionDenied(true);
     }
   }, [dispatch, processAudio]);
 

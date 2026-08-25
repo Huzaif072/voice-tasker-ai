@@ -23,6 +23,15 @@ export function suggestPriority(task: Task, history: Task[], now = new Date(), p
     score += 1;
     reasons.push("similar tasks are frequently completed at high priority");
   }
+  const tagSignals = (task.tags ?? []).map((tag) => tag.trim().toLowerCase()).filter(Boolean).map((tag) => ({ completed: profile?.completionByTag?.[tag] ?? 0, highPriority: profile?.highPriorityByTag?.[tag] ?? 0 }));
+  if (tagSignals.some((signal) => signal.completed >= 2 && signal.highPriority / signal.completed >= 0.75)) {
+    score += 1;
+    reasons.push("your history favors high priority for this type of task");
+  }
+  if (profile?.preferredCompletionHour !== undefined && task.dueDate) {
+    const dueHour = new Date(task.dueDate).getHours();
+    if (Math.abs(dueHour - profile.preferredCompletionHour) <= 1) reasons.push("deadline matches your usual completion time");
+  }
   if (profile && profile.completedTaskCount >= 5 && profile.highPriorityCompletedCount / profile.completedTaskCount >= 0.6 && priorityWeight[task.priority] < priorityWeight.high) {
     score += 1;
     reasons.push("your completed tasks are usually high priority");

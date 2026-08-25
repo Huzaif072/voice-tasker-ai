@@ -21,6 +21,7 @@ export default function TasksPage() {
     status: filter === "Completed" ? "completed" : undefined,
     active: filter === "Active",
     highPriority: filter === "High Priority",
+    scope: filter === "Assigned to me" ? "assigned" : "owned",
   });
   const tasks = taskPageQuery.data?.tasks ?? [];
   const updateTask = useUpdateTask();

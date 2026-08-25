@@ -1,4 +1,4 @@
-import type { Task, TaskPriority, TaskStatus } from "@/types/task";
+import type { AssignmentStatus, Task, TaskPriority, TaskStatus } from "@/types/task";
 
 const priorities: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const statuses: TaskStatus[] = ["pending", "in_progress", "completed", "cancelled"];
@@ -10,6 +10,10 @@ export function normalizeTask(input: Partial<Task>): Task {
   const status = statuses.includes(input.status as TaskStatus)
     ? (input.status as TaskStatus)
     : "pending";
+  const assignmentStatuses: AssignmentStatus[] = ["none", "pending", "accepted", "declined"];
+  const assignmentStatus = assignmentStatuses.includes(input.assignmentStatus as AssignmentStatus)
+    ? input.assignmentStatus as AssignmentStatus
+    : input.assigneeUserId ? "pending" : "none";
 
   return {
     _id: input._id?.toString(),
@@ -29,6 +33,8 @@ export function normalizeTask(input: Partial<Task>): Task {
     contextTriggers: Array.isArray(input.contextTriggers) ? input.contextTriggers : [],
     delegatedTo: input.delegatedTo,
     delegatedPhone: input.delegatedPhone,
+    assigneeUserId: input.assigneeUserId,
+    assignmentStatus,
     delegationStatus: input.delegationStatus ?? (input.delegatedTo || input.delegatedPhone ? "pending" : "none"),
     createdBy: typeof input.createdBy === "string" ? input.createdBy : "",
     tags: Array.isArray(input.tags) ? input.tags.filter((tag): tag is string => typeof tag === "string") : [],

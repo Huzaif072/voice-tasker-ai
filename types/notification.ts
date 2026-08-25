@@ -16,5 +16,7 @@ export interface Notification {
   read: boolean;
   taskId?: string;
   reminderKey?: string;
+  action?: "assignment" | "reminder";
+  actionLabel?: string;
   createdAt: string;
 }

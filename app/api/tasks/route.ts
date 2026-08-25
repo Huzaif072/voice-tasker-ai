@@ -11,6 +11,8 @@ import { buildTaskFilter, taskCacheKey, taskQuerySchema } from "@/lib/tasks/quer
 import { validateTaskDependencies } from "@/lib/tasks/dependencies";
 import { trackEvent } from "@/lib/analytics/events";
 import { buildCalendarComposeLink } from "@/lib/calendar/link";
+import { createAssignmentNotification, findAssignableUser } from "@/lib/tasks/assignments";
+import { recordRealtimeEvent } from "@/lib/realtime/events";
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
     const dependencyError = await validateTaskDependencies(tasks, auth.user.id, undefined, parsed.data.dependencies);
     if (dependencyError) return NextResponse.json({ error: dependencyError }, { status: 400 });
     const now = new Date().toISOString();
+    const recipient = await findAssignableUser(db, parsed.data.delegatedTo);
 
     const taskDoc = {
       ...parsed.data,
@@ -94,6 +97,8 @@ export async function POST(request: Request) {
       reminderAt: parsed.data.reminderAt || undefined,
       dependencies: parsed.data.dependencies,
       contextTriggers: parsed.data.contextTriggers as Task["contextTriggers"],
+      assigneeUserId: recipient?._id?.toString(),
+      assignmentStatus: recipient ? ("pending" as const) : ("none" as const),
       delegationStatus: parsed.data.delegatedTo || parsed.data.delegatedPhone ? ("pending" as const) : ("none" as const),
       createdBy: auth.user.id,
       createdAt: now,
@@ -101,6 +106,11 @@ export async function POST(request: Request) {
     };
 
     const result = await tasks.insertOne(taskDoc);
+    await recordRealtimeEvent(db, auth.user.id, "task_created", result.insertedId.toString());
+    if (recipient?._id) {
+      await createAssignmentNotification(db, recipient._id.toString(), result.insertedId.toString(), parsed.data.title, auth.user.name);
+      await recordRealtimeEvent(db, recipient._id.toString(), "assignment_changed", result.insertedId.toString());
+    }
     await trackEvent(db, auth.user.id, "task_created", { source: "ui" });
     await invalidateCache(`tasks:${auth.user.id}:*`);
     await invalidateCache(`ai-summary:${auth.user.id}:*`);

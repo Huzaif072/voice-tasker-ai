@@ -8,6 +8,7 @@ import { formatRelativeDate } from "@/lib/utils/date";
 import { priorityConfig } from "@/lib/utils/priority";
 import type { Task } from "@/types/task";
 import { cn } from "@/lib/utils/classnames";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TaskCardProps {
   task: Task;
@@ -18,6 +19,8 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onToggle, onDelete, onEdit, onReschedule }: TaskCardProps) {
+  const { user } = useAuth();
+  const isOwner = user?.id === task.createdBy;
   const priority = priorityConfig[task.priority] ?? priorityConfig.medium;
   const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
   const tags = Array.isArray(task.tags) ? task.tags : [];
@@ -77,7 +80,7 @@ export function TaskCard({ task, onToggle, onDelete, onEdit, onReschedule }: Tas
           <p className="mt-1 text-sm text-slate-400 line-clamp-2">{task.description}</p>
         ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-          {eventUrl ? <a href={eventUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-emerald-300 hover:text-emerald-200"><ExternalLink className="h-3 w-3" />Calendar event</a> : task.calendarLink ? <a href={task.calendarLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-violet-300 hover:text-violet-200"><ExternalLink className="h-3 w-3" />Calendar link</a> : task.dueDate ? <button type="button" onClick={() => void createEvent()} disabled={creatingEvent} className="inline-flex items-center gap-1 text-violet-300 hover:text-violet-200 disabled:opacity-50"><CalendarPlus className="h-3 w-3" />{creatingEvent ? "Creating…" : "Add to Calendar"}</button> : null}
+          {eventUrl ? <a href={eventUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-emerald-300 hover:text-emerald-200"><ExternalLink className="h-3 w-3" />Calendar event</a> : task.calendarLink ? <a href={task.calendarLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-violet-300 hover:text-violet-200"><ExternalLink className="h-3 w-3" />Calendar link</a> : isOwner && task.dueDate ? <button type="button" onClick={() => void createEvent()} disabled={creatingEvent} className="inline-flex items-center gap-1 text-violet-300 hover:text-violet-200 disabled:opacity-50"><CalendarPlus className="h-3 w-3" />{creatingEvent ? "Creating…" : "Add to Calendar"}</button> : null}
           {calendarError ? <span className="text-red-400" role="alert">{calendarError}</span> : null}
           {task.dueDate ? <span>Due {formatRelativeDate(task.dueDate)}</span> : null}
           {subtasks.length > 0 ? (
@@ -86,6 +89,7 @@ export function TaskCard({ task, onToggle, onDelete, onEdit, onReschedule }: Tas
             </span>
           ) : null}
           {task.dependencies?.length ? <span className="text-amber-400">Depends on {task.dependencies.length} task{task.dependencies.length === 1 ? "" : "s"}</span> : null}
+          {!isOwner ? <span className="text-cyan-300">Assigned to you{task.assignmentStatus === "accepted" ? " · accepted" : task.assignmentStatus === "pending" ? " · awaiting response" : ""}</span> : null}
           {tags.map((tag) => (
             <span key={tag} className="rounded bg-slate-700 px-1.5 py-0.5">
               {tag}
@@ -94,10 +98,10 @@ export function TaskCard({ task, onToggle, onDelete, onEdit, onReschedule }: Tas
         </div>
       </div>
 
-      {onReschedule && task._id && !isCompleted ? <button type="button" onClick={() => onReschedule(task._id!)} className="opacity-70 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 text-slate-500 hover:text-violet-300" aria-label={`Reschedule ${task.title} to tomorrow`}
+      {isOwner && onReschedule && task._id && !isCompleted ? <button type="button" onClick={() => onReschedule(task._id!)} className="opacity-70 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 text-slate-500 hover:text-violet-300" aria-label={`Reschedule ${task.title} to tomorrow`}
 ><CalendarClock className="h-4 w-4" /></button> : null}
 
-      {onEdit && task._id ? (
+      {isOwner && onEdit && task._id ? (
         <button
           type="button"
           onClick={() => onEdit(task)}
@@ -108,14 +112,14 @@ export function TaskCard({ task, onToggle, onDelete, onEdit, onReschedule }: Tas
         </button>
       ) : null}
 
-      <button
+      {isOwner ? <button
         type="button"
         onClick={() => onDelete?.(task._id!)}
         className="opacity-0 transition-opacity group-hover:opacity-100 text-slate-500 hover:text-red-400"
         aria-label="Delete task"
       >
         <Trash2 className="h-4 w-4" />
-      </button>
+      </button> : null}
     </motion.div>
   );
 }

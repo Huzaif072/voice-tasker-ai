@@ -1,6 +1,7 @@
 export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type DelegationStatus = "none" | "pending" | "sent" | "accepted" | "declined" | "failed";
+export type AssignmentStatus = "none" | "pending" | "accepted" | "declined";
 export type ContextRecurrence = "hourly" | "daily" | "weekly";
 
 export interface Subtask {
@@ -38,6 +39,8 @@ export interface Task {
   contextTriggers: ContextTrigger[];
   delegatedTo?: string;
   delegatedPhone?: string;
+  assigneeUserId?: string;
+  assignmentStatus?: AssignmentStatus;
   delegationStatus: DelegationStatus;
   createdBy: string;
   tags: string[];

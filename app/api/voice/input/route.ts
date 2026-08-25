@@ -24,6 +24,8 @@ import { withTimeout } from "@/lib/utils/withTimeout";
 import { trackEvent } from "@/lib/analytics/events";
 import { captureException } from "@/lib/monitoring/capture";
 import { validateTaskDependencies } from "@/lib/tasks/dependencies";
+import { createAssignmentNotification, findAssignableUser } from "@/lib/tasks/assignments";
+import { recordRealtimeEvent } from "@/lib/realtime/events";
 
 type VoiceIntent = ParsedIntent & { confidence: number };
 const destructiveActions = new Set(["update", "delete", "delegate"]);
@@ -100,7 +102,16 @@ export async function POST(request: Request) {
   if (!limited.success) return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
 
   try {
-    const body = await request.json();
+    const contentType = request.headers.get("content-type") ?? "";
+    let body: unknown;
+    if (contentType.includes("multipart/form-data")) {
+      const form = await request.formData();
+      const file = form.get("audio");
+      if (!(file instanceof File)) return NextResponse.json({ error: "Audio file is required" }, { status: 400 });
+      body = { audio: Buffer.from(await file.arrayBuffer()).toString("base64"), mimeType: file.type || "audio/webm", conversationId: typeof form.get("conversationId") === "string" ? form.get("conversationId") : undefined };
+    } else {
+      body = await request.json();
+    }
     const parsed = voiceInputSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid voice input" }, { status: 400 });
     let transcript = parsed.data.text ?? "";
@@ -189,8 +200,14 @@ export async function POST(request: Request) {
       const dependencyError = await validateTaskDependencies(tasks, auth.user.id, undefined, intent.dependencies ?? []);
       if (dependencyError) return NextResponse.json({ error: dependencyError }, { status: 400 });
       const calendarLink = intent.calendarLink ?? buildCalendarComposeLink(intent.taskTitle, intent.dueDate ?? intent.reminderAt, intent.durationMinutes);
-      const taskDoc = { title: intent.taskTitle, description: intent.description, status: "pending" as const, priority: intent.priority ?? "medium", dueDate: intent.dueDate, reminderAt: intent.reminderAt, durationMinutes: intent.durationMinutes, calendarQuery: intent.calendarQuery, calendarLink, subtasks: intent.subtasks ?? [], dependencies: intent.dependencies ?? [], contextTriggers: intent.contextTriggers ?? [], delegatedTo: intent.assignee, delegatedPhone: intent.assigneePhone, delegationStatus: intent.assignee || intent.assigneePhone ? ("pending" as const) : ("none" as const), createdBy: auth.user.id, tags: ["voice"], createdAt: now, updatedAt: now };
+      const recipient = await findAssignableUser(db, intent.assignee);
+      const taskDoc = { title: intent.taskTitle, description: intent.description, status: "pending" as const, priority: intent.priority ?? "medium", dueDate: intent.dueDate, reminderAt: intent.reminderAt, durationMinutes: intent.durationMinutes, calendarQuery: intent.calendarQuery, calendarLink, subtasks: intent.subtasks ?? [], dependencies: intent.dependencies ?? [], contextTriggers: intent.contextTriggers ?? [], delegatedTo: intent.assignee, delegatedPhone: intent.assigneePhone, assigneeUserId: recipient?._id?.toString(), assignmentStatus: recipient ? ("pending" as const) : ("none" as const), delegationStatus: intent.assignee || intent.assigneePhone ? ("pending" as const) : ("none" as const), createdBy: auth.user.id, tags: ["voice"], createdAt: now, updatedAt: now };
       const result = await tasks.insertOne(taskDoc);
+      await recordRealtimeEvent(db, auth.user.id, "task_created", result.insertedId.toString());
+      if (recipient?._id) {
+        await createAssignmentNotification(db, recipient._id.toString(), result.insertedId.toString(), intent.taskTitle, auth.user.name);
+        await recordRealtimeEvent(db, recipient._id.toString(), "assignment_changed", result.insertedId.toString());
+      }
       taskId = result.insertedId.toString(); task = { ...taskDoc, _id: taskId } as Task;
       conversationContext = { ...conversationContext, lastTaskId: taskId, lastTaskTitle: task.title };
       await invalidateCache(`tasks:${auth.user.id}:*`);
@@ -217,7 +234,7 @@ export async function POST(request: Request) {
         if (intent.dueDate || intent.reminderAt) fieldUpdates.calendarLink = buildCalendarComposeLink(existing.title, intent.dueDate ?? intent.reminderAt, intent.durationMinutes ?? existing.durationMinutes);
         if (!Object.keys(fieldUpdates).length) fieldUpdates.status = "completed";
         const updated = await tasks.findOneAndUpdate({ _id: existing._id, createdBy: auth.user.id }, { $set: { ...fieldUpdates, updatedAt: now } }, { returnDocument: "after" });
-        taskId = existing._id!.toString(); task = updated ? { ...updated, _id: taskId } as Task : undefined; conversationContext = { ...conversationContext, lastTaskId: taskId, lastTaskTitle: existing.title }; message = actionMessage("update", existing.title); await invalidateCache(`tasks:${auth.user.id}:*`); await invalidateCache(`ai-summary:${auth.user.id}:*`);
+        taskId = existing._id!.toString(); task = updated ? { ...updated, _id: taskId } as Task : undefined; conversationContext = { ...conversationContext, lastTaskId: taskId, lastTaskTitle: existing.title }; message = actionMessage("update", existing.title); await recordRealtimeEvent(db, auth.user.id, "task_updated", taskId); await invalidateCache(`tasks:${auth.user.id}:*`); await invalidateCache(`ai-summary:${auth.user.id}:*`);
         if (fieldUpdates.status === "completed") {
           await trackEvent(db, userId, "task_completed");
           const users = await getUsersCollection(db);
@@ -226,7 +243,7 @@ export async function POST(request: Request) {
       } else {
         await tasks.deleteOne({ _id: existing._id, createdBy: auth.user.id });
         await cancelTaskDeliveries(db, existing._id!.toString(), auth.user.id);
-        taskId = existing._id!.toString(); conversationContext = { ...conversationContext, lastTaskId: taskId, lastTaskTitle: existing.title }; message = actionMessage("delete", existing.title); await invalidateCache(`tasks:${auth.user.id}:*`); await invalidateCache(`ai-summary:${auth.user.id}:*`);
+        taskId = existing._id!.toString(); conversationContext = { ...conversationContext, lastTaskId: taskId, lastTaskTitle: existing.title }; message = actionMessage("delete", existing.title); await recordRealtimeEvent(db, auth.user.id, "task_deleted", taskId); await invalidateCache(`tasks:${auth.user.id}:*`); await invalidateCache(`ai-summary:${auth.user.id}:*`);
         await trackEvent(db, userId, "task_deleted");
       }
     } else if (intent.action === "delegate" && intent.taskTitle && (intent.assignee || intent.assigneePhone)) {
@@ -237,11 +254,15 @@ export async function POST(request: Request) {
         const validPhone = intent.assigneePhone ? /^\+[1-9]\d{7,14}$/.test(intent.assigneePhone) : false;
         if (intent.assignee && !validEmail || intent.assigneePhone && !validPhone) { success = false; message = "Please provide a valid assignee email or international E.164 phone number."; }
         else {
-          await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { ...(intent.assignee ? { delegatedTo: intent.assignee.toLowerCase() } : {}), ...(intent.assigneePhone ? { delegatedPhone: intent.assigneePhone } : {}), delegationStatus: "pending", updatedAt: now } });
+          const recipient = await findAssignableUser(db, intent.assignee);
+          await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { ...(intent.assignee ? { delegatedTo: intent.assignee.toLowerCase() } : {}), ...(intent.assigneePhone ? { delegatedPhone: intent.assigneePhone } : {}), ...(recipient?._id ? { assigneeUserId: recipient._id.toString(), assignmentStatus: "pending" as const } : { assignmentStatus: "none" as const }), delegationStatus: "pending", updatedAt: now }, ...(recipient?._id ? {} : { $unset: { assigneeUserId: "" } }) });
+          if (recipient?._id) await createAssignmentNotification(db, recipient._id.toString(), existing._id!.toString(), existing.title, auth.user.name);
           const emailSent = intent.assignee ? await sendDelegationEmail(intent.assignee.toLowerCase(), existing.title, auth.user.name) : false;
           const smsResult = intent.assigneePhone ? await sendSms(intent.assigneePhone, `${auth.user.name} delegated a task to you: ${existing.title}`) : { sent: false, configured: false, permanent: false };
           const delivered = emailSent || smsResult.sent;
           await tasks.updateOne({ _id: existing._id, createdBy: auth.user.id }, { $set: { delegationStatus: delivered ? "sent" : "failed", updatedAt: new Date().toISOString() } });
+          await recordRealtimeEvent(db, auth.user.id, "task_updated", existing._id!.toString());
+          if (recipient?._id) await recordRealtimeEvent(db, recipient._id.toString(), "assignment_changed", existing._id!.toString());
           await trackEvent(db, userId, "delegation_sent", { email: emailSent, sms: smsResult.sent });
           taskId = existing._id!.toString(); conversationContext = { ...conversationContext, lastTaskId: taskId, lastTaskTitle: existing.title }; message = delivered ? actionMessage("delegate", existing.title) : `Task “${existing.title}” saved as a failed delegation.`;
           await invalidateCache(`tasks:${auth.user.id}:*`);

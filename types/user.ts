@@ -5,7 +5,7 @@ export interface VoiceSettings {
 }
 
 export type AuthProvider = "credentials" | "google" | "apple";
-export type ReminderChannel = "in_app" | "email" | "push";
+export type ReminderChannel = "in_app" | "email" | "push" | "voice";
 
 export interface ReminderSettings {
   enabled: boolean;
@@ -21,8 +21,14 @@ export interface LinkedProvider {
 export interface BehaviorProfile {
   completedTaskCount: number;
   highPriorityCompletedCount: number;
+  completionByPriority?: Partial<Record<TaskPriorityKey, number>>;
+  completionByTag?: Record<string, number>;
+  highPriorityByTag?: Record<string, number>;
+  preferredCompletionHour?: number;
   updatedAt: string;
 }
+
+type TaskPriorityKey = "low" | "medium" | "high" | "urgent";
 
 export interface User {
   _id?: string;

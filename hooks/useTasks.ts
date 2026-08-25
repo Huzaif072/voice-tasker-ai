@@ -7,7 +7,7 @@ import { broadcastTaskChange } from "@/lib/tasks/sync";
 import { useAuth } from "@/hooks/useAuth";
 
 export interface TaskPage { tasks: Task[]; page: number; limit: number; total: number; hasMore: boolean; }
-export interface TaskQueryParams { page?: number; limit?: number; search?: string; status?: TaskStatus; active?: boolean; highPriority?: boolean; }
+export interface TaskQueryParams { page?: number; limit?: number; search?: string; status?: TaskStatus; active?: boolean; highPriority?: boolean; scope?: "owned" | "assigned" | "all"; }
 
 function buildTaskUrl(params: TaskQueryParams): string {
   const query = new URLSearchParams();
@@ -17,6 +17,7 @@ function buildTaskUrl(params: TaskQueryParams): string {
   if (params.status) query.set("status", params.status);
   if (params.active) query.set("active", "true");
   if (params.highPriority) query.set("highPriority", "true");
+  if (params.scope && params.scope !== "owned") query.set("scope", params.scope);
   const suffix = query.toString();
   return suffix ? `/api/tasks?${suffix}` : "/api/tasks";
 }
@@ -64,7 +65,7 @@ export function useTasks() {
 
 export function usePaginatedTasks(params: TaskQueryParams) {
   const { user } = useAuth();
-  const normalizedParams = { page: params.page ?? 1, limit: params.limit ?? 25, search: params.search?.trim() ?? "", status: params.status, active: Boolean(params.active), highPriority: Boolean(params.highPriority) };
+  const normalizedParams = { page: params.page ?? 1, limit: params.limit ?? 25, search: params.search?.trim() ?? "", status: params.status, active: Boolean(params.active), highPriority: Boolean(params.highPriority), scope: params.scope ?? "owned" };
   return useQuery({ queryKey: ["tasks", user?.id ?? "anonymous", normalizedParams], queryFn: () => fetchTaskPage(normalizedParams, user!.id), placeholderData: keepPreviousData, staleTime: 60_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false, enabled: Boolean(user?.id) });
 }
 

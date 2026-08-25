@@ -6,7 +6,7 @@ export const accountDeleteSchema = z.object({
 
 export const reminderSettingsSchema = z.object({
   enabled: z.boolean(),
-  channels: z.array(z.enum(["in_app", "email", "push"])).min(1).max(3).refine((channels) => channels.includes("in_app"), "In-app delivery must remain enabled"),
+  channels: z.array(z.enum(["in_app", "email", "push", "voice"])).min(1).max(4).refine((channels) => channels.includes("in_app"), "In-app delivery must remain enabled"),
 });
 
 export const pushSubscriptionSchema = z.object({

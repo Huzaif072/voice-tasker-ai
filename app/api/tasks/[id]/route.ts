@@ -12,6 +12,8 @@ import { cancelTaskDeliveries } from "@/lib/reminders/cancelTaskDeliveries";
 import { validateTaskDependencies } from "@/lib/tasks/dependencies";
 import { trackEvent } from "@/lib/analytics/events";
 import { buildCalendarComposeLink } from "@/lib/calendar/link";
+import { createAssignmentNotification, findAssignableUser } from "@/lib/tasks/assignments";
+import { recordRealtimeEvent } from "@/lib/realtime/events";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,7 +29,7 @@ export async function GET(request: Request, { params }: Params) {
   try {
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
-    const task = await tasks.findOne({ _id: new ObjectId(id), createdBy: auth.user.id });
+    const task = await tasks.findOne({ _id: new ObjectId(id), $or: [{ createdBy: auth.user.id }, { assigneeUserId: auth.user.id }] });
     if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
     return NextResponse.json({
       task: normalizeTask({ ...task, _id: task._id?.toString() } as Partial<Task>),
@@ -82,18 +84,31 @@ export async function PATCH(request: Request, { params }: Params) {
   try {
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
-    const existing = await tasks.findOne({ _id: new ObjectId(id), createdBy: auth.user.id }, { projection: { status: 1, priority: 1, title: 1, durationMinutes: 1, updatedAt: 1 } });
+    const existing = await tasks.findOne({ _id: new ObjectId(id), $or: [{ createdBy: auth.user.id }, { assigneeUserId: auth.user.id }] }, { projection: { status: 1, priority: 1, title: 1, durationMinutes: 1, updatedAt: 1, createdBy: 1, assigneeUserId: 1 } });
     if (!existing) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    const isOwner = existing.createdBy === auth.user.id;
+    const recipientEditableFields = new Set(["status", "subtasks", "baseUpdatedAt"]);
+    if (!isOwner && Object.keys(parsed.data).some((field) => !recipientEditableFields.has(field))) return NextResponse.json({ error: "Only the task owner can edit this task" }, { status: 403 });
     if (baseUpdatedAt && existing.updatedAt !== baseUpdatedAt) return NextResponse.json({ error: "Task changed elsewhere; review it before saving this edit", conflict: true }, { status: 409 });
     if (updateFields.dependencies) {
       const dependencyError = await validateTaskDependencies(tasks, auth.user.id, id, updateFields.dependencies);
       if (dependencyError) return NextResponse.json({ error: dependencyError }, { status: 400 });
     }
     if ((updateFields.dueDate || updateFields.reminderAt) && !updateFields.calendarLink && existing) updateFields.calendarLink = buildCalendarComposeLink(existing.title, updateFields.dueDate || updateFields.reminderAt, updateFields.durationMinutes ?? existing.durationMinutes);
-    if (typeof updateFields.delegatedTo === "string" || typeof updateFields.delegatedPhone === "string") updateFields.delegationStatus = "pending";
+    const recipient = isOwner && updateFields.delegatedTo ? await findAssignableUser(db, updateFields.delegatedTo) : null;
+    if (isOwner && (typeof updateFields.delegatedTo === "string" || typeof updateFields.delegatedPhone === "string")) {
+      updateFields.delegationStatus = "pending";
+      if (recipient?._id) {
+        (updateFields as typeof updateFields & { assigneeUserId?: string; assignmentStatus?: "pending" }).assigneeUserId = recipient._id.toString();
+        (updateFields as typeof updateFields & { assignmentStatus?: "pending" }).assignmentStatus = "pending";
+      } else {
+        (updateFields as typeof updateFields & { assignmentStatus?: "none" }).assignmentStatus = "none";
+        unsetFields.assigneeUserId = "";
+      }
+    }
     if (unsetFields.delegatedTo && unsetFields.delegatedPhone) updateFields.delegationStatus = "none";
     const result = await tasks.findOneAndUpdate(
-      { _id: new ObjectId(id), createdBy: auth.user.id },
+      { _id: new ObjectId(id), $or: [{ createdBy: auth.user.id }, { assigneeUserId: auth.user.id }] },
       {
         $set: { ...updateFields, updatedAt: new Date().toISOString() },
         ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}),
@@ -102,6 +117,12 @@ export async function PATCH(request: Request, { params }: Params) {
     );
 
     if (!result) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    if (recipient?._id && isOwner) {
+      await createAssignmentNotification(db, recipient._id.toString(), id, existing.title, auth.user.name);
+      await recordRealtimeEvent(db, recipient._id.toString(), "assignment_changed", id);
+    }
+    await recordRealtimeEvent(db, existing.createdBy, "task_updated", id);
+    if (existing.assigneeUserId) await recordRealtimeEvent(db, existing.assigneeUserId, "task_updated", id);
     const newlyCompleted = existing?.status !== "completed" && result.status === "completed";
     if (newlyCompleted) {
       await trackEvent(db, auth.user.id, "task_completed");
@@ -112,9 +133,10 @@ export async function PATCH(request: Request, { params }: Params) {
       );
     }
     if (result.status === "completed" || result.status === "cancelled") {
-      await cancelTaskDeliveries(db, id, auth.user.id);
+      await cancelTaskDeliveries(db, id, existing.createdBy);
     }
     await invalidateCache(`tasks:${auth.user.id}:*`);
+    if (existing.createdBy !== auth.user.id) await invalidateCache(`tasks:${existing.createdBy}:*`);
     await invalidateCache(`ai-summary:${auth.user.id}:*`);
 
     return NextResponse.json({
@@ -143,6 +165,7 @@ export async function DELETE(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
     await cancelTaskDeliveries(db, id, auth.user.id);
+    await recordRealtimeEvent(db, auth.user.id, "task_deleted", id);
     await trackEvent(db, auth.user.id, "task_deleted");
 
     await invalidateCache(`tasks:${auth.user.id}:*`);

@@ -14,12 +14,17 @@ export const taskQuerySchema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
   active: booleanQuery,
   highPriority: booleanQuery,
+  scope: z.enum(["owned", "assigned", "all"]).default("owned"),
 });
 
 export type TaskQuery = z.infer<typeof taskQuerySchema>;
 
 export function buildTaskFilter(userId: string, query: TaskQuery): Filter<TaskDocument> {
-  const filter: Filter<TaskDocument> = { createdBy: userId };
+  const filter: Filter<TaskDocument> = query.scope === "assigned"
+    ? { assigneeUserId: userId }
+    : query.scope === "all"
+      ? { $or: [{ createdBy: userId }, { assigneeUserId: userId }] }
+      : { createdBy: userId };
   if (query.status) filter.status = query.status;
   if (query.active) filter.status = { $in: ["pending", "in_progress"] };
   if (query.highPriority) filter.priority = { $in: ["high", "urgent"] };
@@ -28,5 +33,5 @@ export function buildTaskFilter(userId: string, query: TaskQuery): Filter<TaskDo
 }
 
 export function taskCacheKey(userId: string, query: TaskQuery): string {
-  return `tasks:${userId}:${query.page}:${query.limit}:${encodeURIComponent(query.search)}:${query.status ?? "all"}:${query.active ? "active" : "all-statuses"}:${query.highPriority ? "high-priority" : "all-priorities"}`;
+  return `tasks:${userId}:${query.page}:${query.limit}:${encodeURIComponent(query.search)}:${query.status ?? "all"}:${query.active ? "active" : "all-statuses"}:${query.highPriority ? "high-priority" : "all-priorities"}:${query.scope}`;
 }

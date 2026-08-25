@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { contextLocationStorageKey } from "@/hooks/useContextLocation";
 
 type Provider = { provider: string; linkedAt: string };
-type ReminderChannel = "in_app" | "email" | "push";
+type ReminderChannel = "in_app" | "email" | "push" | "voice";
 type ReminderSettings = { enabled: boolean; channels: ReminderChannel[] };
 type ProviderHealth = Record<string, string>;
 
 export default function SecurityPage() {
   const { logout } = useAuth();
+  const queryClient = useQueryClient();
   const { status: pushStatus, error: pushError, subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [hasPassword, setHasPassword] = useState(false);
@@ -72,6 +74,7 @@ export default function SecurityPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Unable to update reminder settings");
       setReminderSettings(data.settings);
+      queryClient.setQueryData(["reminder-settings"], data.settings);
       setMessage("Reminder settings saved.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to update reminder settings.");
@@ -182,13 +185,13 @@ export default function SecurityPage() {
       </section>
       <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
         <h2 className="text-lg font-semibold text-slate-100">Task reminders</h2>
-        <p className="mt-2 text-sm text-slate-400">Choose whether due reminders create in-app, email, or push notifications. In-app reminders remain the fallback channel.</p>
+        <p className="mt-2 text-sm text-slate-400">Choose whether due reminders create in-app, email, push, or browser voice notifications. In-app reminders remain the fallback channel.</p>
         <label className="mt-4 flex items-center gap-3 text-sm text-slate-300">
           <input type="checkbox" checked={reminderSettings.enabled} onChange={(event) => setReminderSettings((current) => ({ ...current, enabled: event.target.checked }))} className="h-4 w-4 accent-violet-500" />
           Enable task reminders
         </label>
         <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-300">
-          {(["in_app", "email", "push"] as ReminderChannel[]).map((channel) => (
+          {(["in_app", "email", "push", "voice"] as ReminderChannel[]).map((channel) => (
             <label key={channel} className="flex items-center gap-2">
               <input type="checkbox" checked={reminderSettings.channels.includes(channel) && (channel !== "push" || pushStatus === "subscribed")} disabled={channel === "in_app" || (channel === "push" && pushStatus !== "subscribed")} onChange={() => toggleReminderChannel(channel)} className="h-4 w-4 accent-violet-500" />
               <span className="capitalize">{channel.replace("_", " ")}</span>

@@ -15,9 +15,25 @@ export function useSocket(userId?: string) {
     };
     const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("voicetasker-task-changes") : null;
     channel?.addEventListener("message", invalidate);
-    const onOnline = () => invalidate();
+    const onOnline = () => { invalidate(); void pollServerEvents(); };
     window.addEventListener("online", onOnline);
-    const fallbackPoll = window.setInterval(invalidate, 30_000);
+    const lastEventAt = { current: new Date().toISOString() };
+    async function pollServerEvents() {
+      try {
+        const response = await fetch(`/api/realtime/events?since=${encodeURIComponent(lastEventAt.current)}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json() as { events?: Array<{ createdAt?: string }> };
+        const events = Array.isArray(data.events) ? data.events : [];
+        if (!events.length) return;
+        const newest = events.at(-1)?.createdAt;
+        if (newest) lastEventAt.current = newest;
+        invalidate();
+      } catch {
+        // Optional event feed failures fall back to the existing socket and local-channel paths.
+      }
+    }
+    void pollServerEvents();
+    const fallbackPoll = window.setInterval(() => void pollServerEvents(), 10_000);
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
     const socketEnabled = process.env.NEXT_PUBLIC_SOCKET_ENABLED === "true";
     const isLocalSocket = /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/.test(socketUrl?.replace(/\/$/, "") ?? "");
