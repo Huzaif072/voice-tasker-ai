@@ -8,10 +8,11 @@ interface TaskListProps {
   tasks: Task[];
   onToggle?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onEdit?: (task: Task) => void;
   emptyMessage?: string;
 }
 
-export function TaskList({ tasks, onToggle, onDelete, emptyMessage = "No tasks yet. Try speaking one!" }: TaskListProps) {
+export function TaskList({ tasks, onToggle, onDelete, onEdit, emptyMessage = "No tasks yet. Try speaking one!" }: TaskListProps) {
   if (tasks.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-700 py-12 text-center">
@@ -28,7 +29,7 @@ export function TaskList({ tasks, onToggle, onDelete, emptyMessage = "No tasks y
       className="space-y-3"
     >
       {tasks.map((task) => (
-        <TaskCard key={task._id} task={task} onToggle={onToggle} onDelete={onDelete} />
+        <TaskCard key={task._id} task={task} onToggle={onToggle} onDelete={onDelete} onEdit={onEdit} />
       ))}
     </motion.div>
   );

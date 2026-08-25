@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Trash2, Check } from "lucide-react";
+import { Trash2, Check, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { formatRelativeDate } from "@/lib/utils/date";
 import { priorityConfig } from "@/lib/utils/priority";
@@ -12,9 +12,10 @@ interface TaskCardProps {
   task: Task;
   onToggle?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onEdit?: (task: Task) => void;
 }
 
-export function TaskCard({ task, onToggle, onDelete }: TaskCardProps) {
+export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
   const priority = priorityConfig[task.priority] ?? priorityConfig.medium;
   const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
   const tags = Array.isArray(task.tags) ? task.tags : [];
@@ -69,7 +70,19 @@ export function TaskCard({ task, onToggle, onDelete }: TaskCardProps) {
         </div>
       </div>
 
+      {onEdit && task._id ? (
+        <button
+          type="button"
+          onClick={() => onEdit(task)}
+          className="opacity-0 transition-opacity group-hover:opacity-100 text-slate-500 hover:text-violet-300"
+          aria-label={`Edit ${task.title}`}
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+      ) : null}
+
       <button
+        type="button"
         onClick={() => onDelete?.(task._id!)}
         className="opacity-0 transition-opacity group-hover:opacity-100 text-slate-500 hover:text-red-400"
         aria-label="Delete task"

@@ -1,4 +1,5 @@
 import { normalizeTask } from "../lib/tasks/normalize.ts";
+import { taskUpdateSchema } from "../lib/validators/task.ts";
 
 const legacyTask = normalizeTask({
   _id: "legacy-task",
@@ -39,4 +40,14 @@ if (malformedTask.tags.length !== 1 || malformedTask.tags[0] !== "valid") {
   throw new Error("Non-string tags should be discarded");
 }
 
-console.log("PASS: legacy and malformed task records normalize safely.");
+const editableTask = taskUpdateSchema.safeParse({
+  title: "Updated task",
+  status: "in_progress",
+  priority: "high",
+  dueDate: "2026-08-25T12:00:00.000Z",
+  tags: ["work"],
+  subtasks: [{ id: "subtask-1", title: "Review details", completed: false }],
+});
+if (!editableTask.success) throw new Error("Task detail edits should accept supported metadata and subtasks");
+
+console.log("PASS: legacy and malformed task records normalize safely; editable task payloads validate.");

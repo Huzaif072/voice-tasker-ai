@@ -7,12 +7,14 @@ import { TaskFilters, type TaskFilter } from "@/components/dashboard/TaskFilters
 import { useTasks, useUpdateTask, useDeleteTask } from "@/hooks/useTasks";
 import type { Task } from "@/types/task";
 import { useDashboardSearch } from "@/hooks/useDashboardSearch";
+import { TaskEditorModal } from "@/components/dashboard/TaskEditorModal";
 
 export default function TasksPage() {
   const { data: tasks = [], isLoading, isError, refetch } = useTasks();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const [filter, setFilter] = useState<TaskFilter>("All");
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { search } = useDashboardSearch();
 
   const filtered = useMemo(() => {
@@ -56,6 +58,10 @@ export default function TasksPage() {
           <TaskList
             tasks={filtered as Task[]}
             emptyMessage={search.trim() ? "No tasks match your search." : undefined}
+            onEdit={(task) => {
+              updateTask.reset();
+              setEditingTask(task);
+            }}
             onToggle={(id) => {
               if (updateTask.isPending) return;
               const task = tasks.find((t) => t._id === id);
@@ -80,6 +86,26 @@ export default function TasksPage() {
           {updateTask.isError ? "Unable to update that task." : "Unable to delete that task."}
         </p>
       ) : null}
+      <TaskEditorModal
+        key={editingTask ? `${editingTask._id}-${editingTask.updatedAt}` : "task-editor-closed"}
+        open={Boolean(editingTask)}
+        task={editingTask}
+        saving={updateTask.isPending}
+        error={updateTask.isError ? (updateTask.error instanceof Error ? updateTask.error.message : "Unable to save task") : null}
+        onClose={() => {
+          if (!updateTask.isPending) {
+            updateTask.reset();
+            setEditingTask(null);
+          }
+        }}
+        onSave={(data) => {
+          if (!editingTask?._id) return;
+          updateTask.mutate(
+            { id: editingTask._id, ...data },
+            { onSuccess: () => setEditingTask(null) }
+          );
+        }}
+      />
     </motion.div>
   );
 }

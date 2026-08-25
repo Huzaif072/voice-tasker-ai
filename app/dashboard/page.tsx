@@ -7,6 +7,7 @@ import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { TaskList } from "@/components/dashboard/TaskList";
 import { TaskFilters, type TaskFilter } from "@/components/dashboard/TaskFilters";
 import { TaskForm } from "@/components/dashboard/TaskForm";
+import { TaskEditorModal } from "@/components/dashboard/TaskEditorModal";
 import { Button } from "@/components/ui/Button";
 import { useTasks, useUpdateTask, useDeleteTask, useCreateTask } from "@/hooks/useTasks";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +22,7 @@ export default function DashboardPage() {
   const createTask = useCreateTask();
   const [filter, setFilter] = useState<TaskFilter>("All");
   const [showForm, setShowForm] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { search } = useDashboardSearch();
 
   const filtered = useMemo(() => {
@@ -125,6 +127,10 @@ export default function DashboardPage() {
             <TaskList
               tasks={filtered as Task[]}
               emptyMessage={search.trim() ? "No tasks match your search." : undefined}
+              onEdit={(task) => {
+                updateTask.reset();
+                setEditingTask(task);
+              }}
               onToggle={handleToggle}
               onDelete={(id) => {
                 if (deleteTask.isPending) return;
@@ -142,6 +148,27 @@ export default function DashboardPage() {
           </p>
         ) : null}
       </div>
+
+      <TaskEditorModal
+        key={editingTask ? `${editingTask._id}-${editingTask.updatedAt}` : "task-editor-closed"}
+        open={Boolean(editingTask)}
+        task={editingTask}
+        saving={updateTask.isPending}
+        error={updateTask.isError ? (updateTask.error instanceof Error ? updateTask.error.message : "Unable to save task") : null}
+        onClose={() => {
+          if (!updateTask.isPending) {
+            updateTask.reset();
+            setEditingTask(null);
+          }
+        }}
+        onSave={(data) => {
+          if (!editingTask?._id) return;
+          updateTask.mutate(
+            { id: editingTask._id, ...data },
+            { onSuccess: () => setEditingTask(null) }
+          );
+        }}
+      />
 
       <TaskForm
         key={showForm ? "task-form-open" : "task-form-closed"}
