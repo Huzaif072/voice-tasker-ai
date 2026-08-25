@@ -6,6 +6,7 @@ import { getUsersCollection } from "@/lib/db/models/User";
 import { getTasksCollection } from "@/lib/db/models/Task";
 import { getNotificationsCollection } from "@/lib/db/models/Notification";
 import { getVoiceSessionsCollection } from "@/lib/db/models/VoiceSession";
+import { sanitizeUserForExport } from "@/lib/account/export";
 
 function serialize<T extends { _id?: ObjectId }>(value: T) {
   const { _id, ...rest } = value;
@@ -31,13 +32,9 @@ export async function GET(request: Request) {
 
     if (!user) return NextResponse.json({ error: "Account not found" }, { status: 404 });
 
-    const safeUser = { ...user } as Record<string, unknown> & { _id?: ObjectId };
-    for (const field of ["password", "passwordResetTokenHash", "passwordResetExpiresAt", "emailVerificationTokenHash", "emailVerificationExpiresAt"]) {
-      delete safeUser[field];
-    }
     const payload = {
       exportedAt: new Date().toISOString(),
-      user: serialize(safeUser),
+      user: sanitizeUserForExport(user),
       tasks: tasks.map(serialize),
       notifications: notifications.map(serialize),
       voiceSessions: sessions.map(serialize),

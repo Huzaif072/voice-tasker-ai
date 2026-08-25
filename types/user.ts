@@ -5,6 +5,12 @@ export interface VoiceSettings {
 }
 
 export type AuthProvider = "credentials" | "google" | "apple";
+export type ReminderChannel = "in_app" | "email" | "push";
+
+export interface ReminderSettings {
+  enabled: boolean;
+  channels: ReminderChannel[];
+}
 
 export interface LinkedProvider {
   provider: AuthProvider;
@@ -29,6 +35,7 @@ export interface User {
   disabledAt?: string;
   voiceSettings: VoiceSettings;
   pushSubscription?: unknown;
+  reminderSettings?: ReminderSettings;
   createdAt: string;
 }
 

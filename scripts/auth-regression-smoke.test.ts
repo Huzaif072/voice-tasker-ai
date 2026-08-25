@@ -1,9 +1,9 @@
 import jwt from "jsonwebtoken";
-import { signupSchema } from "../lib/validators/auth.ts";
-import { rateLimit } from "../lib/redis/ratelimit.ts";
-import { voiceInputSchema } from "../lib/validators/voice.ts";
-import { isSessionVersionCurrent } from "../lib/auth/session.ts";
-import { getSafeReturnTo } from "../lib/auth/redirect.ts";
+import { signupSchema } from "../lib/validators/auth";
+import { rateLimit } from "../lib/redis/ratelimit";
+import { voiceInputSchema } from "../lib/validators/voice";
+import { isSessionVersionCurrent } from "../lib/auth/session";
+import { getSafeReturnTo } from "../lib/auth/redirect";
 
 async function main() {
 if (!isSessionVersionCurrent(undefined, 4) || !isSessionVersionCurrent(0, undefined) || isSessionVersionCurrent(3, 2)) {
@@ -40,9 +40,9 @@ if (!normalized.success || normalized.data.name !== "Ada Lovelace" || normalized
   throw new Error("Expected signup input to trim the name and normalize the email");
 }
 
-process.env.NODE_ENV = "production";
+  (process.env as Record<string, string | undefined>).NODE_ENV = "production";
 process.env.JWT_SECRET = "a".repeat(32);
-const { signToken, verifyToken } = await import("../lib/auth/jwt.ts");
+const { signToken, verifyToken } = await import("../lib/auth/jwt");
 const token = signToken({ id: "507f1f77bcf86cd799439011", name: "Ada", email: "user@example.com" });
 if (!verifyToken(token)) {
   throw new Error("Expected a correctly issued JWT to verify");

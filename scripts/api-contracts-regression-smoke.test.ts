@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "../lib/auth/middleware.ts";
-import { decomposeInputSchema, followupInputSchema } from "../lib/validators/ai.ts";
+import { requireAuth } from "../lib/auth/middleware";
+import { decomposeInputSchema, followupInputSchema } from "../lib/validators/ai";
 
 async function main() {
   const unauthenticated = await requireAuth(new Request("http://localhost/api/tasks"));

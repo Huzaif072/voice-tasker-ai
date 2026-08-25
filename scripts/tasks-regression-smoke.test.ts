@@ -1,6 +1,6 @@
-import { normalizeTask } from "../lib/tasks/normalize.ts";
-import { taskUpdateSchema } from "../lib/validators/task.ts";
-import { buildTaskFilter, taskQuerySchema } from "../lib/tasks/query.ts";
+import { normalizeTask } from "../lib/tasks/normalize";
+import { taskUpdateSchema } from "../lib/validators/task";
+import { buildTaskFilter, taskQuerySchema } from "../lib/tasks/query";
 
 const legacyTask = normalizeTask({
   _id: "legacy-task",

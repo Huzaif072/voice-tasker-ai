@@ -1,4 +1,4 @@
-import { parseNotificationId } from "../lib/notifications/ids.ts";
+import { parseNotificationId } from "../lib/notifications/ids";
 
 const validId = parseNotificationId("507f1f77bcf86cd799439011");
 if (!validId || validId.toHexString() !== "507f1f77bcf86cd799439011") {

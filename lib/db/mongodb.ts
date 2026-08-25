@@ -36,8 +36,12 @@ function getClientPromise(): Promise<MongoClient> {
   return clientPromise;
 }
 
+export async function getMongoClient(): Promise<MongoClient> {
+  return getClientPromise();
+}
+
 export async function getDb(): Promise<Db> {
-  const connected = await getClientPromise();
+  const connected = await getMongoClient();
   return connected.db("voicetasker");
 }
 

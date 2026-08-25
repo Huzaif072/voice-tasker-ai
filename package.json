@@ -13,7 +13,9 @@
     "test:notifications": "tsx scripts/notifications-regression-smoke.test.ts",
     "test:delegation": "tsx scripts/delegation-regression-smoke.test.ts",
     "test:api": "tsx scripts/api-contracts-regression-smoke.test.ts",
-    "test:all": "npm run test:auth && npm run test:voice && npm run test:tasks && npm run test:notifications && npm run test:delegation && npm run test:api"
+    "test:account": "tsx scripts/account-regression-smoke.test.ts",
+    "test:health": "tsx scripts/health-regression-smoke.test.ts",
+    "test:all": "npm run test:auth && npm run test:voice && npm run test:tasks && npm run test:notifications && npm run test:delegation && npm run test:api && npm run test:account && npm run test:health"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",
@@ -27,9 +29,8 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.22.0",
     "mongodb": "^7.4.0",
-    "next": "16.2.9",
-    "next-auth": "^5.0.0-beta.31",
-    "nodemailer": "^7.0.13",
+    "next": "16.3.2",
+    "nodemailer": "^9.0.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-redux": "^9.3.0",
@@ -48,7 +49,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
     "typescript": "^5"

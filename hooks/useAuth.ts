@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { RootState } from "@/store";
@@ -14,6 +15,7 @@ async function fetchCurrentUser() {
 }
 
 export function useAuth() {
+  const router = useRouter();
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const reduxUser = useSelector((s: RootState) => s.auth.user);
@@ -37,9 +39,9 @@ export function useAuth() {
     } finally {
       queryClient.setQueryData(["auth", "me"], null);
       dispatch(logoutAction());
-      window.location.href = "/login";
+      router.push("/login");
     }
-  }, [dispatch, queryClient]);
+  }, [dispatch, queryClient, router]);
 
   return { user: user ?? reduxUser, loading: isLoading, logout, isAuthenticated: Boolean(user ?? reduxUser) };
 }

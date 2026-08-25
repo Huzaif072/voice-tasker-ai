@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { basicRegexIntent, cleanTaskTitle, normalizeDueDate } from "../lib/groq/intent-parser.ts";
-import { createVoiceConfirmation, verifyVoiceConfirmation } from "../lib/voice/confirmation.ts";
-import { withTimeout } from "../lib/utils/withTimeout.ts";
+import { basicRegexIntent, cleanTaskTitle, normalizeDueDate } from "../lib/groq/intent-parser";
+import { createVoiceConfirmation, verifyVoiceConfirmation } from "../lib/voice/confirmation";
+import { withTimeout } from "../lib/utils/withTimeout";
 
 async function main() {
   process.env.JWT_SECRET = process.env.JWT_SECRET ?? "voice-regression-test-secret";
@@ -20,6 +20,7 @@ async function main() {
   assert.equal(verifyVoiceConfirmation(token, "user-1", "delete", "task-2"), false);
 
   assert.equal(await withTimeout(Promise.resolve("ok"), 100), "ok");
+  await assert.rejects(() => withTimeout(Promise.reject(new Error("provider failed")), 100), /provider failed/);
   await assert.rejects(() => withTimeout(new Promise(() => undefined), 5), /timed out/);
 
   console.log("PASS: voice parser, confirmation binding, and provider timeout contracts are covered.");

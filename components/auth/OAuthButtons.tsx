@@ -26,6 +26,8 @@ export function OAuthButtons({ returnTo }: { returnTo?: string } = {}) {
 
   function startOAuth(provider: "google" | "apple") {
     setLoadingProvider(provider);
+    // OAuth endpoints issue a full redirect to an external provider.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign(`/api/auth/${provider}?returnTo=${encodeURIComponent(safeReturnTo)}`);
   }
 

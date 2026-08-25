@@ -1,4 +1,4 @@
-import { delegationSchema } from "../lib/validators/delegation.ts";
+import { delegationSchema } from "../lib/validators/delegation";
 
 const valid = delegationSchema.safeParse({
   taskId: "507f1f77bcf86cd799439011",

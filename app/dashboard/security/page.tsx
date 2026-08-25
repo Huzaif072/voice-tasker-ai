@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
 
 type Provider = { provider: string; linkedAt: string };
+type ReminderChannel = "in_app" | "email" | "push";
+type ReminderSettings = { enabled: boolean; channels: ReminderChannel[] };
 
 export default function SecurityPage() {
   const { logout } = useAuth();
@@ -15,6 +17,8 @@ export default function SecurityPage() {
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
+  const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ enabled: true, channels: ["in_app"] });
+  const [savingReminders, setSavingReminders] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/providers")
@@ -27,6 +31,42 @@ export default function SecurityPage() {
       })
       .catch(() => setMessage("Unable to load account security details."));
   }, []);
+
+  useEffect(() => {
+    fetch("/api/account/reminders")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => { if (data?.settings) setReminderSettings(data.settings); })
+      .catch(() => setMessage("Unable to load reminder settings."));
+  }, []);
+
+  async function saveReminderSettings() {
+    setSavingReminders(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/account/reminders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reminderSettings),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to update reminder settings");
+      setReminderSettings(data.settings);
+      setMessage("Reminder settings saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update reminder settings.");
+    } finally {
+      setSavingReminders(false);
+    }
+  }
+
+  function toggleReminderChannel(channel: ReminderChannel) {
+    setReminderSettings((current) => {
+      const channels = current.channels.includes(channel)
+        ? current.channels.filter((item) => item !== channel)
+        : [...current.channels, channel];
+      return { ...current, channels: channels.includes("in_app") ? channels : ["in_app", ...channels] };
+    });
+  }
 
   async function unlinkProvider(provider: string) {
     if (!window.confirm(`Unlink ${provider}? All current sessions will be signed out.`)) return;
@@ -65,7 +105,13 @@ export default function SecurityPage() {
   function exportAccount() {
     setExporting(true);
     setMessage("");
-    window.location.assign("/api/account/export");
+    const link = document.createElement("a");
+    link.href = "/api/account/export";
+    link.download = "voicetasker-account-export.json";
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
     window.setTimeout(() => setExporting(false), 1500);
   }
 
@@ -108,6 +154,23 @@ export default function SecurityPage() {
             </div>
           ))}
         </div>
+      </section>
+      <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
+        <h2 className="text-lg font-semibold text-slate-100">Task reminders</h2>
+        <p className="mt-2 text-sm text-slate-400">Choose whether due reminders create in-app, email, or push notifications. In-app reminders remain the fallback channel.</p>
+        <label className="mt-4 flex items-center gap-3 text-sm text-slate-300">
+          <input type="checkbox" checked={reminderSettings.enabled} onChange={(event) => setReminderSettings((current) => ({ ...current, enabled: event.target.checked }))} className="h-4 w-4 accent-violet-500" />
+          Enable task reminders
+        </label>
+        <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-300">
+          {(["in_app", "email", "push"] as ReminderChannel[]).map((channel) => (
+            <label key={channel} className="flex items-center gap-2">
+              <input type="checkbox" checked={reminderSettings.channels.includes(channel)} disabled={channel === "in_app"} onChange={() => toggleReminderChannel(channel)} className="h-4 w-4 accent-violet-500" />
+              <span className="capitalize">{channel.replace("_", " ")}</span>
+            </label>
+          ))}
+        </div>
+        <Button className="mt-4" onClick={saveReminderSettings} loading={savingReminders}>Save reminder settings</Button>
       </section>
       <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
         <h2 className="text-lg font-semibold text-slate-100">Your data</h2>

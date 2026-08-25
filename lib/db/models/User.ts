@@ -1,5 +1,5 @@
 import type { Db, Collection, ObjectId } from "mongodb";
-import type { User } from "@/types/user";
+import type { ReminderChannel, User } from "@/types/user";
 
 export type UserDocument = Omit<User, "_id"> & { _id?: ObjectId };
 
@@ -20,3 +20,4 @@ export async function getUsersCollection(db: Db): Promise<Collection<UserDocumen
 }
 
 export const defaultVoiceSettings = { language: "en-US", speed: 1, enabled: true };
+export const defaultReminderSettings: { enabled: boolean; channels: ReminderChannel[] } = { enabled: true, channels: ["in_app"] };

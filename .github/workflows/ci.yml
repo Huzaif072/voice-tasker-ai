@@ -29,3 +29,5 @@ jobs:
         run: npm run lint
       - name: Production build
         run: npm run build
+      - name: Runtime dependency audit
+        run: npm audit --omit=dev
