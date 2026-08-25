@@ -12,6 +12,8 @@ export default function SecurityPage() {
   const [hasPassword, setHasPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export default function SecurityPage() {
 
   async function revokeSessions() {
     setLoading(true);
+    setMessage("");
     try {
       const response = await fetch("/api/auth/revoke-sessions", { method: "POST" });
       if (!response.ok) throw new Error();
@@ -59,10 +62,36 @@ export default function SecurityPage() {
     }
   }
 
+  function exportAccount() {
+    setExporting(true);
+    setMessage("");
+    window.location.assign("/api/account/export");
+    window.setTimeout(() => setExporting(false), 1500);
+  }
+
+  async function deleteAccount() {
+    if (!window.confirm("This permanently deletes your account, tasks, notifications, and voice history. Continue?")) return;
+    setDeleting(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: "DELETE" }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error ?? "Unable to delete account");
+      await logout();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to delete account.");
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold text-slate-100">Account security</h1>
-      <p className="mt-2 text-slate-400">Review how you sign in and invalidate sessions on other devices.</p>
+      <p className="mt-2 text-slate-400">Review how you sign in, manage sessions, and control your account data.</p>
       <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
         <h2 className="text-lg font-semibold text-slate-100">Sign-in methods</h2>
         <div className="mt-4 space-y-3">
@@ -72,12 +101,7 @@ export default function SecurityPage() {
               <span className="capitalize">{provider}</span>
               <div className="flex items-center gap-3">
                 <span className="text-slate-500">Linked {new Date(linkedAt).toLocaleDateString()}</span>
-                <button
-                  type="button"
-                  onClick={() => unlinkProvider(provider)}
-                  disabled={unlinkingProvider !== null}
-                  className="text-xs text-rose-300 hover:text-rose-200 disabled:opacity-50"
-                >
+                <button type="button" onClick={() => unlinkProvider(provider)} disabled={unlinkingProvider !== null || deleting} className="text-xs text-rose-300 hover:text-rose-200 disabled:opacity-50">
                   {unlinkingProvider === provider ? "Unlinking…" : "Unlink"}
                 </button>
               </div>
@@ -85,12 +109,24 @@ export default function SecurityPage() {
           ))}
         </div>
       </section>
+      <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6">
+        <h2 className="text-lg font-semibold text-slate-100">Your data</h2>
+        <p className="mt-2 text-sm text-slate-400">Download a JSON copy of your profile, tasks, notifications, and voice history.</p>
+        <Button className="mt-4" onClick={exportAccount} loading={exporting}>Export account data</Button>
+      </section>
       <section className="mt-6 rounded-2xl border border-rose-900/50 bg-rose-950/20 p-6">
         <h2 className="text-lg font-semibold text-slate-100">Log out all devices</h2>
         <p className="mt-2 text-sm text-slate-400">This invalidates every existing session, including this device.</p>
-        <Button className="mt-4" onClick={revokeSessions} loading={loading}>Log out all devices</Button>
-        {message ? <p className="mt-3 text-sm text-rose-300" role="alert">{message}</p> : null}
+        <Button className="mt-4" onClick={revokeSessions} loading={loading} disabled={deleting}>Log out all devices</Button>
       </section>
+      <section className="mt-6 rounded-2xl border border-rose-900/50 bg-rose-950/20 p-6">
+        <h2 className="text-lg font-semibold text-rose-100">Delete account</h2>
+        <p className="mt-2 text-sm text-rose-200/70">This permanently removes your account and all associated tasks, notifications, and voice history.</p>
+        <button type="button" onClick={deleteAccount} disabled={deleting || loading} className="mt-4 rounded-lg border border-rose-700 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-900/40 disabled:cursor-not-allowed disabled:opacity-50">
+          {deleting ? "Deleting account…" : "Delete account"}
+        </button>
+      </section>
+      {message ? <p className="mt-3 text-sm text-rose-300" role="alert">{message}</p> : null}
     </div>
   );
 }

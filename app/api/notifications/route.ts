@@ -30,21 +30,35 @@ export async function PATCH(request: Request) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
 
-  let id: unknown;
+  let body: unknown;
   try {
-    ({ id } = await request.json());
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const notificationId = parseNotificationId(id);
-  if (!notificationId) {
-    return NextResponse.json({ error: "Invalid notification ID" }, { status: 400 });
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  const payload = body as { id?: unknown; all?: unknown };
   try {
     const db = await connectWithRetry();
     const notifications = await getNotificationsCollection(db);
+
+    if (payload.all === true) {
+      const result = await notifications.updateMany(
+        { userId: auth.user.id, read: { $ne: true } },
+        { $set: { read: true } }
+      );
+      return NextResponse.json({ success: true, updatedCount: result.modifiedCount });
+    }
+
+    const notificationId = parseNotificationId(payload.id);
+    if (!notificationId) {
+      return NextResponse.json({ error: "Invalid notification ID" }, { status: 400 });
+    }
+
     const result = await notifications.updateOne(
       { _id: notificationId, userId: auth.user.id },
       { $set: { read: true } }
@@ -54,8 +68,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Notification not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "Failed to update notification" }, { status: 503 });
+    return NextResponse.json({ success: true, updatedCount: result.modifiedCount });
+  } catch (error) {
+    console.error("Notification update error:", error);
+    return NextResponse.json({ error: "Failed to update notifications" }, { status: 503 });
   }
 }

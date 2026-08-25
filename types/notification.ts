@@ -13,5 +13,6 @@ export interface Notification {
   message: string;
   read: boolean;
   taskId?: string;
+  reminderKey?: string;
   createdAt: string;
 }

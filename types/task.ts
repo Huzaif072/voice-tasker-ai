@@ -19,6 +19,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   dueDate?: string;
+  reminderAt?: string;
   subtasks: Subtask[];
   contextTriggers: ContextTrigger[];
   delegatedTo?: string;

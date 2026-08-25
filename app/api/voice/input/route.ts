@@ -14,10 +14,12 @@ import { createVoiceConfirmation, verifyVoiceConfirmation } from "@/lib/voice/co
 import type { Task } from "@/types/task";
 import { normalizeTask } from "@/lib/tasks/normalize";
 import type { ParsedIntent } from "@/types/voice";
+import { withTimeout } from "@/lib/utils/withTimeout";
 
 type VoiceIntent = ParsedIntent & { confidence: number };
 
 const destructiveActions = new Set(["update", "delete", "delegate"]);
+const VOICE_PROVIDER_TIMEOUT_MS = 15_000;
 
 function actionMessage(action: string, taskTitle?: string, success = true): string {
   if (!success) return taskTitle ? `Could not find a task matching "${taskTitle}".` : "Action could not be completed.";
@@ -62,13 +64,13 @@ export async function POST(request: Request) {
     let transcript = parsed.data.text ?? "";
     if (!transcript && parsed.data.audio) {
       const buffer = Buffer.from(parsed.data.audio, "base64");
-      try { transcript = await transcribeAudio(buffer, parsed.data.mimeType ?? "audio/webm"); }
-      catch { try { transcript = await transcribeLocal(buffer); } catch { return NextResponse.json({ error: "Transcription failed" }, { status: 502 }); } }
+      try { transcript = await withTimeout(transcribeAudio(buffer, parsed.data.mimeType ?? "audio/webm"), VOICE_PROVIDER_TIMEOUT_MS, "Remote transcription timed out"); }
+      catch { try { transcript = await withTimeout(transcribeLocal(buffer), VOICE_PROVIDER_TIMEOUT_MS, "Local transcription timed out"); } catch { return NextResponse.json({ error: "Transcription failed" }, { status: 502 }); } }
     }
     if (!transcript.trim()) return NextResponse.json({ error: "No speech detected" }, { status: 400 });
 
     let intent: VoiceIntent;
-    try { intent = await parseIntent(transcript); } catch { intent = basicRegexIntent(transcript); }
+    try { intent = await withTimeout(parseIntent(transcript), VOICE_PROVIDER_TIMEOUT_MS, "Intent parsing timed out"); } catch { intent = basicRegexIntent(transcript); }
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
     const sessions = await getVoiceSessionsCollection(db);

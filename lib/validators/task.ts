@@ -12,6 +12,7 @@ const descriptionSchema = z.string().trim().max(5000);
 const statusSchema = z.enum(["pending", "in_progress", "completed", "cancelled"]);
 const prioritySchema = z.enum(["low", "medium", "high", "urgent"]);
 const dueDateSchema = z.string().datetime().or(z.literal(""));
+const reminderAtSchema = z.string().datetime().or(z.literal(""));
 const delegatedToSchema = z.string().trim().toLowerCase().email().or(z.literal(""));
 
 export const taskSchema = z.object({
@@ -20,6 +21,7 @@ export const taskSchema = z.object({
   status: statusSchema.default("pending"),
   priority: prioritySchema.default("medium"),
   dueDate: dueDateSchema.optional(),
+  reminderAt: reminderAtSchema.optional(),
   subtasks: z.array(subtaskSchema).max(100).default([]),
   tags: z.array(tagSchema).max(50).default([]),
   delegatedTo: delegatedToSchema.optional(),
@@ -31,6 +33,7 @@ export const taskUpdateSchema = z.object({
   status: statusSchema.optional(),
   priority: prioritySchema.optional(),
   dueDate: dueDateSchema.optional(),
+  reminderAt: reminderAtSchema.optional(),
   subtasks: z.array(subtaskSchema).max(100).optional(),
   tags: z.array(tagSchema).max(50).optional(),
   delegatedTo: delegatedToSchema.optional(),

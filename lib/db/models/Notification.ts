@@ -8,7 +8,10 @@ let indexesPromise: Promise<void> | null = null;
 export async function getNotificationsCollection(db: Db): Promise<Collection<NotificationDocument>> {
   const col = db.collection<NotificationDocument>(NOTIFICATIONS_COLLECTION);
   if (!indexesPromise) {
-    indexesPromise = col.createIndex({ userId: 1, read: 1, createdAt: -1 }).then(() => undefined).catch((error) => { indexesPromise = null; throw error; });
+    indexesPromise = Promise.all([
+      col.createIndex({ userId: 1, read: 1, createdAt: -1 }),
+      col.createIndex({ reminderKey: 1 }, { unique: true, sparse: true }),
+    ]).then(() => undefined).catch((error) => { indexesPromise = null; throw error; });
   }
   await indexesPromise;
   return col;

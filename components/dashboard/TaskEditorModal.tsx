@@ -14,6 +14,7 @@ export interface TaskEditorData {
   status: TaskStatus;
   priority: TaskPriority;
   dueDate?: string;
+  reminderAt?: string;
   tags: string[];
   delegatedTo?: string;
   subtasks: Subtask[];
@@ -48,6 +49,7 @@ export function TaskEditorModal({ open, task, onClose, onSave, saving = false, e
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "pending");
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? "medium");
   const [dueDate, setDueDate] = useState(toLocalDateTime(task?.dueDate));
+  const [reminderAt, setReminderAt] = useState(toLocalDateTime(task?.reminderAt));
   const [tags, setTags] = useState(task?.tags.join(", ") ?? "");
   const [delegatedTo, setDelegatedTo] = useState(task?.delegatedTo ?? "");
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);
@@ -74,7 +76,8 @@ export function TaskEditorModal({ open, task, onClose, onSave, saving = false, e
       description: description.trim() || undefined,
       status,
       priority,
-      dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+      dueDate: dueDate ? new Date(dueDate).toISOString() : "",
+      reminderAt: reminderAt ? new Date(reminderAt).toISOString() : "",
       tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
       delegatedTo: delegatedTo.trim() || undefined,
       subtasks: subtasks.filter((subtask) => subtask.title.trim()),
@@ -109,9 +112,15 @@ export function TaskEditorModal({ open, task, onClose, onSave, saving = false, e
             </select>
           </div>
         </div>
-        <div>
-          <label htmlFor="edit-task-due-date" className="mb-2 block text-sm font-medium text-slate-300">Due date</label>
-          <input id="edit-task-due-date" type="datetime-local" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="edit-task-due-date" className="mb-2 block text-sm font-medium text-slate-300">Due date</label>
+            <input id="edit-task-due-date" type="datetime-local" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20" />
+          </div>
+          <div>
+            <label htmlFor="edit-task-reminder-at" className="mb-2 block text-sm font-medium text-slate-300">Reminder time</label>
+            <input id="edit-task-reminder-at" type="datetime-local" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2.5 text-slate-100 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20" />
+          </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Input label="Tags" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="work, important" className="border-slate-600 bg-slate-700 text-slate-100" />

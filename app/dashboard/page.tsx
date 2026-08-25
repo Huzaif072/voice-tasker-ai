@@ -180,12 +180,14 @@ export default function DashboardPage() {
         error={createTask.isError ? (createTask.error instanceof Error ? createTask.error.message : "Unable to create task") : null}
         onSubmit={(data) => {
           const dueDate = data.dueDate ? new Date(data.dueDate).toISOString() : undefined;
+          const reminderAt = data.reminderAt ? new Date(data.reminderAt).toISOString() : undefined;
           createTask.mutate(
             {
               title: data.title,
               description: data.description,
               priority: data.priority,
               dueDate,
+              reminderAt,
               tags: data.tags,
               delegatedTo: data.delegatedTo,
             },

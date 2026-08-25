@@ -18,6 +18,7 @@ export function normalizeTask(input: Partial<Task>): Task {
     status,
     priority,
     dueDate: input.dueDate,
+    reminderAt: input.reminderAt,
     subtasks: Array.isArray(input.subtasks) ? input.subtasks : [],
     contextTriggers: Array.isArray(input.contextTriggers) ? input.contextTriggers : [],
     delegatedTo: input.delegatedTo,

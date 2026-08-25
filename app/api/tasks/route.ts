@@ -79,6 +79,7 @@ export async function POST(request: Request) {
     const taskDoc = {
       ...parsed.data,
       dueDate: parsed.data.dueDate || undefined,
+      reminderAt: parsed.data.reminderAt || undefined,
       contextTriggers: [] as Task["contextTriggers"],
       createdBy: auth.user.id,
       createdAt: now,

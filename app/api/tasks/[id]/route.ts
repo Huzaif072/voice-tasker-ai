@@ -59,6 +59,14 @@ export async function PATCH(request: Request, { params }: Params) {
     delete updateFields.delegatedTo;
     unsetFields.delegatedTo = "";
   }
+  if (updateFields.dueDate === "") {
+    delete updateFields.dueDate;
+    unsetFields.dueDate = "";
+  }
+  if (updateFields.reminderAt === "") {
+    delete updateFields.reminderAt;
+    unsetFields.reminderAt = "";
+  }
 
   try {
     const db = await connectWithRetry();
