@@ -18,6 +18,7 @@ const calendarQuerySchema = z.string().trim().max(200).or(z.literal(""));
 const delegatedToSchema = z.string().trim().toLowerCase().email().or(z.literal(""));
 const delegatedPhoneSchema = z.string().trim().regex(/^\+[1-9]\d{7,14}$/, "Phone must use international E.164 format").or(z.literal(""));
 const dependencySchema = z.string().trim().regex(/^[a-f0-9]{24}$/i, "Invalid dependency ID");
+const recurrenceSchema = z.enum(["hourly", "daily", "weekly"]);
 const contextTriggerSchema = z.object({
   type: z.enum(["location", "time", "calendar", "weather", "keyword"]),
   value: z.string().trim().min(1).max(200),
@@ -25,6 +26,7 @@ const contextTriggerSchema = z.object({
   longitude: z.number().finite().min(-180).max(180).optional(),
   radiusMeters: z.number().int().min(25).max(100_000).optional(),
   condition: z.string().trim().max(100).optional(),
+  recurrence: recurrenceSchema.optional(),
   lastTriggeredAt: z.string().datetime().optional(),
 }).superRefine((value, context) => {
   if (value.type === "location" && (value.latitude === undefined || value.longitude === undefined)) {
@@ -35,6 +37,9 @@ const contextTriggerSchema = z.object({
   }
   if (value.type === "time" && !z.string().datetime().safeParse(value.value).success) {
     context.addIssue({ code: "custom", path: ["value"], message: "Time triggers require an ISO timestamp" });
+  }
+  if (value.type !== "time" && value.recurrence !== undefined) {
+    context.addIssue({ code: "custom", path: ["recurrence"], message: "Recurrence is supported only for time triggers" });
   }
 });
 

@@ -1,6 +1,7 @@
 export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type DelegationStatus = "none" | "pending" | "sent" | "accepted" | "declined" | "failed";
+export type ContextRecurrence = "hourly" | "daily" | "weekly";
 
 export interface Subtask {
   id: string;
@@ -15,6 +16,7 @@ export interface ContextTrigger {
   longitude?: number;
   radiusMeters?: number;
   condition?: string;
+  recurrence?: ContextRecurrence;
   lastTriggeredAt?: string;
 }
 

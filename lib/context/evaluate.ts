@@ -9,6 +9,15 @@ import type { ContextTrigger } from "@/types/task";
 interface Position { latitude: number; longitude: number }
 interface Weather { temperature?: number; precipitation?: number; rain?: number; weatherCode?: number }
 
+const MIN_TRIGGER_INTERVAL_MS = 30 * 60 * 1000;
+const RECURRENCE_INTERVAL_MS = {
+  hourly: 60 * 60 * 1000,
+  daily: 24 * 60 * 60 * 1000,
+  weekly: 7 * 24 * 60 * 60 * 1000,
+} as const;
+
+type WeatherLocation = { latitude: number; longitude: number };
+
 function distanceMeters(a: Position, b: Position) {
   const earthRadius = 6_371_000;
   const lat1 = a.latitude * Math.PI / 180;
@@ -17,6 +26,10 @@ function distanceMeters(a: Position, b: Position) {
   const dLon = (b.longitude - a.longitude) * Math.PI / 180;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
   return 2 * earthRadius * Math.asin(Math.sqrt(h));
+}
+
+function weatherLocationKey(location: WeatherLocation) {
+  return `${location.latitude},${location.longitude}`;
 }
 
 async function fetchWeather(latitude: number, longitude: number): Promise<Weather | null> {
@@ -42,6 +55,19 @@ function weatherMatches(trigger: ContextTrigger, weather: Weather | null) {
   return false;
 }
 
+function recurrenceInterval(trigger: ContextTrigger) {
+  return trigger.type === "time" && trigger.recurrence ? RECURRENCE_INTERVAL_MS[trigger.recurrence] : undefined;
+}
+
+function triggerCanRun(trigger: ContextTrigger, now: Date) {
+  if (!trigger.lastTriggeredAt) return true;
+  const lastTriggered = Date.parse(trigger.lastTriggeredAt);
+  if (!Number.isFinite(lastTriggered)) return true;
+  if (trigger.type === "time" && !trigger.recurrence) return false;
+  const interval = recurrenceInterval(trigger) ?? MIN_TRIGGER_INTERVAL_MS;
+  return now.getTime() - lastTriggered >= interval;
+}
+
 function triggerMatches(trigger: ContextTrigger, now: Date, position: Position | undefined, weather: Weather | null, events: Array<{ summary: string }>) {
   if (trigger.type === "time") {
     const timestamp = Date.parse(trigger.value);
@@ -59,14 +85,32 @@ function triggerMatches(trigger: ContextTrigger, now: Date, position: Position |
   return false;
 }
 
+async function getWeatherByLocation(activeTasks: Array<{ contextTriggers?: ContextTrigger[] }>) {
+  const locations = new Map<string, WeatherLocation>();
+  for (const task of activeTasks) {
+    for (const trigger of task.contextTriggers ?? []) {
+      if (trigger.type !== "weather" || trigger.latitude === undefined || trigger.longitude === undefined) continue;
+      const location = { latitude: trigger.latitude, longitude: trigger.longitude };
+      locations.set(weatherLocationKey(location), location);
+    }
+  }
+
+  const entries: Array<readonly [string, Weather | null]> = [];
+  const locationsList = [...locations.values()];
+  for (let index = 0; index < locationsList.length; index += 6) {
+    const batch = locationsList.slice(index, index + 6);
+    entries.push(...await Promise.all(batch.map(async (location) => [weatherLocationKey(location), await fetchWeather(location.latitude, location.longitude)] as const)));
+  }
+  return new Map(entries);
+}
+
 export async function evaluateContextTriggers(db: Db, userId: string, position?: Position) {
   const tasks = await getTasksCollection(db);
   const notifications = await getNotificationsCollection(db);
   const users = await getUsersCollection(db);
   const user = ObjectId.isValid(userId) ? await users.findOne({ _id: new ObjectId(userId) }).catch(() => null) : null;
-  const activeTasks = await tasks.find({ createdBy: userId, status: { $nin: ["completed", "cancelled"] }, "contextTriggers.0": { $exists: true } }).limit(100).toArray();
-  const weatherLocations = activeTasks.flatMap((task) => (task.contextTriggers ?? []).filter((trigger) => trigger.type === "weather" && trigger.latitude !== undefined && trigger.longitude !== undefined).map((trigger) => ({ latitude: trigger.latitude!, longitude: trigger.longitude! })));
-  const weather = weatherLocations[0] ? await fetchWeather(weatherLocations[0].latitude, weatherLocations[0].longitude) : null;
+  const activeTasks = await tasks.find({ createdBy: userId, status: { $nin: ["completed", "cancelled"] }, "contextTriggers.0": { $exists: true } }).toArray();
+  const weatherByLocation = await getWeatherByLocation(activeTasks);
   const calendarEvents = user ? await getUpcomingCalendarEvents(user, users).catch(() => []) : [];
   const now = new Date();
   let matched = 0;
@@ -76,18 +120,22 @@ export async function evaluateContextTriggers(db: Db, userId: string, position?:
     let changed = false;
     const nextTriggers: ContextTrigger[] = [];
     for (const trigger of triggers) {
-      const lastTriggered = trigger.lastTriggeredAt ? Date.parse(trigger.lastTriggeredAt) : 0;
-      if (lastTriggered && now.getTime() - lastTriggered < 30 * 60 * 1000) {
+      if (!triggerCanRun(trigger, now)) {
         nextTriggers.push(trigger);
         continue;
       }
+      const weather = trigger.type === "weather" && trigger.latitude !== undefined && trigger.longitude !== undefined
+        ? weatherByLocation.get(weatherLocationKey({ latitude: trigger.latitude, longitude: trigger.longitude })) ?? null
+        : null;
       if (!triggerMatches(trigger, now, position, weather, calendarEvents)) {
         nextTriggers.push(trigger);
         continue;
       }
       changed = true;
       matched += 1;
-      const reminderKey = `context:${task._id?.toString()}:${trigger.type}:${trigger.value}:${now.toISOString().slice(0, 13)}`;
+      const interval = recurrenceInterval(trigger);
+      const occurrence = interval ? Math.floor(now.getTime() / interval) : now.toISOString().slice(0, 13);
+      const reminderKey = `context:${task._id?.toString()}:${trigger.type}:${trigger.value}:${occurrence}`;
       await notifications.updateOne(
         { userId, reminderKey },
         { $setOnInsert: { userId, type: "context_trigger", title: "Context reminder", message: `Context matched for task: ${task.title}`, read: false, taskId: task._id?.toString(), reminderKey, createdAt: now.toISOString() } },

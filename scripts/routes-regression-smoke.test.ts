@@ -3,11 +3,13 @@ import { GET as getReminderSettings } from "../app/api/account/reminders/route";
 import { GET as getPushStatus } from "../app/api/account/push-subscription/route";
 import { DELETE as deleteAccount } from "../app/api/account/route";
 import { POST as runReminders } from "../app/api/scheduled/reminders/route";
+import { GET as getProviderHealth } from "../app/api/health/providers/route";
 
 async function main() {
   const unauthenticated = new Request("http://localhost/api/account/reminders");
   assert.equal((await getReminderSettings(unauthenticated)).status, 401);
   assert.equal((await getPushStatus(new Request("http://localhost/api/account/push-subscription"))).status, 401);
+  assert.equal((await getProviderHealth(new Request("http://localhost/api/health/providers"))).status, 401);
   assert.equal((await deleteAccount(new Request("http://localhost/api/account", { method: "DELETE", body: JSON.stringify({ confirmation: "DELETE" }) }))).status, 401);
 
   const previousSecret = process.env.REMINDER_WORKER_SECRET;

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import type { ContextTrigger, TaskPriority } from "@/types/task";
+import type { ContextRecurrence, ContextTrigger, TaskPriority } from "@/types/task";
 
 export interface TaskFormData {
   title: string;
@@ -39,6 +39,7 @@ export function TaskForm({ open, onClose, onSubmit, submitting = false, error }:
   const [triggerValue, setTriggerValue] = useState("");
   const [triggerLatitude, setTriggerLatitude] = useState("");
   const [triggerLongitude, setTriggerLongitude] = useState("");
+  const [triggerRecurrence, setTriggerRecurrence] = useState<ContextRecurrence | "">("");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,7 +54,7 @@ export function TaskForm({ open, onClose, onSubmit, submitting = false, error }:
       reminderAt: reminderAt ? new Date(reminderAt).toISOString() : undefined,
       tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
       dependencies: dependencies.split(",").map((id) => id.trim()).filter(Boolean),
-      contextTriggers: triggerValue.trim() ? [{ type: triggerType, value: triggerValue.trim(), ...(triggerType === "location" || triggerType === "weather" ? { latitude: Number(triggerLatitude), longitude: Number(triggerLongitude) } : {}) }] : [],
+      contextTriggers: triggerValue.trim() ? [{ type: triggerType, value: triggerValue.trim(), ...(triggerType === "time" && triggerRecurrence ? { recurrence: triggerRecurrence } : {}), ...(triggerType === "location" || triggerType === "weather" ? { latitude: Number(triggerLatitude), longitude: Number(triggerLongitude) } : {}) }] : [],
       delegatedTo: delegatedTo.trim() || undefined,
     });
   }
@@ -90,11 +91,12 @@ export function TaskForm({ open, onClose, onSubmit, submitting = false, error }:
         <div className="rounded-lg border border-slate-700 p-3">
           <p className="mb-2 text-sm font-medium text-slate-300">Context trigger (optional)</p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <select aria-label="Context trigger type" value={triggerType} onChange={(event) => setTriggerType(event.target.value as ContextTrigger["type"])} className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-slate-100">
+            <select aria-label="Context trigger type" value={triggerType} onChange={(event) => { const nextType = event.target.value as ContextTrigger["type"]; setTriggerType(nextType); if (nextType !== "time") setTriggerRecurrence(""); }} className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-slate-100">
               <option value="time">Time</option><option value="location">Location</option><option value="weather">Weather</option><option value="calendar">Calendar keyword</option>
             </select>
             <Input label="Value" value={triggerValue} onChange={(event) => setTriggerValue(event.target.value)} placeholder={triggerType === "time" ? "2026-09-01T09:00:00.000Z" : triggerType === "weather" ? "rain" : "office"} className="border-slate-600 bg-slate-700 text-slate-100" />
           </div>
+          {triggerType === "time" ? <div className="mt-3"><label htmlFor="context-trigger-recurrence" className="mb-2 block text-sm font-medium text-slate-300">Repeat</label><select id="context-trigger-recurrence" value={triggerRecurrence} onChange={(event) => setTriggerRecurrence(event.target.value as ContextRecurrence | "")} className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-slate-100"><option value="">Once</option><option value="hourly">Hourly</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select></div> : null}
           {triggerType === "location" || triggerType === "weather" ? <div className="mt-3 grid gap-3 sm:grid-cols-2"><Input label="Latitude" type="number" value={triggerLatitude} onChange={(event) => setTriggerLatitude(event.target.value)} className="border-slate-600 bg-slate-700 text-slate-100" /><Input label="Longitude" type="number" value={triggerLongitude} onChange={(event) => setTriggerLongitude(event.target.value)} className="border-slate-600 bg-slate-700 text-slate-100" /></div> : null}
         </div>
         <Input label="Delegate to (email)" type="email" value={delegatedTo} onChange={(e) => setDelegatedTo(e.target.value)} placeholder="teammate@example.com" className="border-slate-600 bg-slate-700 text-slate-100" />

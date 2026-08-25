@@ -16,6 +16,8 @@ const parsedTask = taskSchema.safeParse({
 assert.equal(parsedTask.success, true);
 assert.equal(taskSchema.safeParse({ title: "Invalid time", contextTriggers: [{ type: "time", value: "tomorrow" }] }).success, false);
 assert.equal(taskSchema.safeParse({ title: "Valid time", contextTriggers: [{ type: "time", value: new Date().toISOString() }] }).success, true);
+assert.equal(taskSchema.safeParse({ title: "Recurring time", contextTriggers: [{ type: "time", value: new Date().toISOString(), recurrence: "daily" }] }).success, true);
+assert.equal(taskSchema.safeParse({ title: "Invalid recurrence", contextTriggers: [{ type: "weather", value: "rain", latitude: 40, longitude: -73, recurrence: "daily" }] }).success, false);
 assert.equal(delegationSchema.safeParse({ taskId: "507f1f77bcf86cd799439011", phone: "+15551234567" }).success, true);
 assert.equal(delegationSchema.safeParse({ taskId: "507f1f77bcf86cd799439011" }).success, false);
 

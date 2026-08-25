@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createProviderHealthResponse, type ProviderHealth } from "../app/api/health/providers/route";
 
 async function main() {
   const previousUri = process.env.MONGODB_URI;
@@ -16,7 +17,24 @@ async function main() {
   assert.equal(typeof body.timestamp, "string");
   if (previousUri) process.env.MONGODB_URI = previousUri;
   else delete process.env.MONGODB_URI;
-  console.log("PASS: health endpoint returns a safe readiness failure without leaking dependency details.");
+  const providerStatuses: ProviderHealth = {
+    mongodb: "ok",
+    redis: "unavailable",
+    groq: "configured",
+    email: "unconfigured",
+    push: "configured",
+    googleCalendar: "disabled",
+    twilio: "unconfigured",
+    sentry: "configured",
+  };
+  const providerResponse = createProviderHealthResponse(providerStatuses);
+  const providerBody = await providerResponse.json();
+  assert.equal(providerResponse.status, 200);
+  assert.equal(providerResponse.headers.get("cache-control"), "no-store");
+  assert.deepEqual(providerBody.providers, providerStatuses);
+  assert.equal(typeof providerBody.timestamp, "string");
+  assert.equal(JSON.stringify(providerBody).includes("SENTRY_AUTH_TOKEN"), false);
+  console.log("PASS: readiness and provider-health endpoints return safe, non-sensitive status contracts.");
 }
 
 main().catch((error) => {
