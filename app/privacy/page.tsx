@@ -3,7 +3,7 @@ import { LegalPage } from "@/components/legal/LegalPage";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — VoiceTasker AI",
-  description: "Development draft privacy policy for VoiceTasker AI.",
+  description: "Privacy policy for VoiceTasker AI.",
 };
 
 export default function PrivacyPage() {
@@ -11,7 +11,7 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacy Policy"
       lastUpdated="August 24, 2026"
-      intro="This development draft explains the information VoiceTasker AI is designed to handle while you create and manage tasks by voice."
+      intro="This policy explains the information VoiceTasker AI handles while you create and manage tasks by voice."
     >
       <h2>1. Information we collect</h2>
       <p>
@@ -36,10 +36,11 @@ export default function PrivacyPage() {
 
       <h2>3. Service providers</h2>
       <p>
-        The development architecture may send relevant data to infrastructure providers used by the
-        application, such as a MongoDB database, an AI and speech-processing provider, an email provider,
-        a push-notification provider, a hosting provider, and an optional Redis service. The final provider
-        list, data-processing terms, and international-transfer details must be confirmed before launch.
+        Depending on the enabled configuration, relevant data may be processed by MongoDB, Groq speech and
+        AI services, the configured email provider, web-push infrastructure, the hosting provider, Upstash Redis,
+        Sentry, Google Calendar, or Twilio. Optional integrations are only used when their environment settings
+        and user consent are enabled. The deployment owner must publish the providers and data-processing terms
+        that apply to the deployed configuration.
       </p>
 
       <h2>4. Cookies and authentication</h2>
@@ -52,25 +53,25 @@ export default function PrivacyPage() {
 
       <h2>5. Retention and deletion</h2>
       <p>
-        Task, account, notification, and voice-session retention periods are part of the development
-        configuration and must be finalized before public launch. The final product should provide a way
-        to request account deletion and remove or anonymize associated personal data, subject to lawful
-        retention requirements.
+        Account deletion removes the user-owned task, notification, voice-session, and account records through
+        the application’s account-deletion flow, subject to lawful retention requirements. Terminal reminder
+        delivery records expire after the configured 90-day period. The deployment owner must publish retention
+        periods for active tasks, voice-session history, analytics events, logs, backups, and provider-side data.
       </p>
 
       <h2>6. Security</h2>
       <p>
-        The project uses password hashing, signed authentication tokens, input validation, ownership
-        checks, and optional rate limiting. No online service can guarantee absolute security. Production
-        deployment should enforce strong secrets, HTTPS, access controls, monitoring, backups, and a
-        documented incident-response process.
+        The application uses password hashing, signed authentication tokens, input validation, ownership
+        checks, encrypted calendar tokens, redacted provider-health responses, and optional rate limiting. No
+        online service can guarantee absolute security. Deployment owners must configure strong secrets, HTTPS,
+        access controls, monitoring, tested backups, and an incident-response process.
       </p>
 
       <h2>7. Your choices</h2>
       <p>
-        You should be able to access, correct, export, or delete your account information, subject to
-        applicable law and the final product capabilities. You may choose to use typed commands instead
-        of submitting audio when that option is available.
+        You can use the account export and deletion controls, submit typed commands instead of audio, disable
+        optional provider integrations, and contact the address below for privacy requests. Correction, access,
+        restriction, portability, and objection rights depend on applicable law and the deployment owner’s process.
       </p>
 
       <h2>8. Contact</h2>

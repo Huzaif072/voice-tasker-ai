@@ -22,6 +22,8 @@ export function normalizeTask(input: Partial<Task>): Task {
     durationMinutes: input.durationMinutes,
     calendarQuery: input.calendarQuery,
     calendarLink: input.calendarLink,
+    calendarEventId: input.calendarEventId,
+    calendarEventUrl: input.calendarEventUrl,
     subtasks: Array.isArray(input.subtasks) ? input.subtasks : [],
     dependencies: Array.isArray(input.dependencies) ? input.dependencies.filter((id): id is string => typeof id === "string") : [],
     contextTriggers: Array.isArray(input.contextTriggers) ? input.contextTriggers : [],

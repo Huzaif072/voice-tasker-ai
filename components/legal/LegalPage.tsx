@@ -26,7 +26,7 @@ export function LegalPage({ title, lastUpdated, intro, children }: LegalPageProp
 
         <header className="mt-10 border-b border-slate-800 pb-8">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-400">
-            Development draft
+            Product policy
           </p>
           <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-50">{title}</h1>
           <p className="mt-4 text-lg leading-8 text-slate-300">{intro}</p>
@@ -38,8 +38,8 @@ export function LegalPage({ title, lastUpdated, intro, children }: LegalPageProp
         </div>
 
         <p className="mt-12 border-t border-slate-800 pt-6 text-sm leading-6 text-slate-500">
-          This development draft should be reviewed and adapted to the final product, data practices,
-          jurisdiction, and business terms before public launch.
+          This page describes the current application behavior. The deployment owner remains responsible for
+          confirming jurisdiction-specific requirements, provider terms, retention settings, and contact details.
         </p>
       </div>
     </main>

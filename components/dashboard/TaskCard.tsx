@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Trash2, Check, Pencil, CalendarClock, ExternalLink } from "lucide-react";
+import { Trash2, Check, Pencil, CalendarClock, ExternalLink, CalendarPlus } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { formatRelativeDate } from "@/lib/utils/date";
 import { priorityConfig } from "@/lib/utils/priority";
@@ -22,6 +23,25 @@ export function TaskCard({ task, onToggle, onDelete, onEdit, onReschedule }: Tas
   const tags = Array.isArray(task.tags) ? task.tags : [];
   const completedSubtasks = subtasks.filter((s) => s.completed).length;
   const isCompleted = task.status === "completed";
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [createdEventUrl, setCreatedEventUrl] = useState<string | undefined>();
+  const eventUrl = task.calendarEventUrl ?? createdEventUrl;
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  async function createEvent() {
+    if (!task._id || creatingEvent) return;
+    setCreatingEvent(true);
+    setCalendarError(null);
+    try {
+      const response = await fetch("/api/calendar/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ taskId: task._id }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to create calendar event");
+      setCreatedEventUrl(result.eventUrl);
+    } catch (error) {
+      setCalendarError(error instanceof Error ? error.message : "Unable to create calendar event");
+    } finally {
+      setCreatingEvent(false);
+    }
+  }
 
   return (
     <motion.div
@@ -57,7 +77,8 @@ export function TaskCard({ task, onToggle, onDelete, onEdit, onReschedule }: Tas
           <p className="mt-1 text-sm text-slate-400 line-clamp-2">{task.description}</p>
         ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-          {task.calendarLink ? <a href={task.calendarLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-violet-300 hover:text-violet-200"><ExternalLink className="h-3 w-3" />Calendar</a> : null}
+          {eventUrl ? <a href={eventUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-emerald-300 hover:text-emerald-200"><ExternalLink className="h-3 w-3" />Calendar event</a> : task.calendarLink ? <a href={task.calendarLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-violet-300 hover:text-violet-200"><ExternalLink className="h-3 w-3" />Calendar link</a> : task.dueDate ? <button type="button" onClick={() => void createEvent()} disabled={creatingEvent} className="inline-flex items-center gap-1 text-violet-300 hover:text-violet-200 disabled:opacity-50"><CalendarPlus className="h-3 w-3" />{creatingEvent ? "Creating…" : "Add to Calendar"}</button> : null}
+          {calendarError ? <span className="text-red-400" role="alert">{calendarError}</span> : null}
           {task.dueDate ? <span>Due {formatRelativeDate(task.dueDate)}</span> : null}
           {subtasks.length > 0 ? (
             <span>

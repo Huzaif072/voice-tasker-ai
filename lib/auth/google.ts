@@ -18,11 +18,12 @@ interface GoogleProfile {
 
 export function getGoogleAuthUrl(state: string): string {
   const calendarEnabled = process.env.GOOGLE_CALENDAR_ENABLED === "true";
+  const calendarWriteEnabled = process.env.GOOGLE_CALENDAR_WRITE_ENABLED === "true";
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID!,
     redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/google/callback`,
     response_type: "code",
-    scope: calendarEnabled ? "openid email profile https://www.googleapis.com/auth/calendar.readonly" : "openid email profile",
+    scope: calendarEnabled ? `openid email profile ${calendarWriteEnabled ? "https://www.googleapis.com/auth/calendar" : "https://www.googleapis.com/auth/calendar.readonly"}` : "openid email profile",
     access_type: calendarEnabled ? "offline" : "online",
     prompt: calendarEnabled ? "consent" : "select_account",
     state,

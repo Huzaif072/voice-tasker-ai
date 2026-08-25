@@ -58,7 +58,8 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid task update" }, { status: 400 });
   }
 
-  const updateFields = { ...parsed.data } as typeof parsed.data & { delegationStatus?: "none" | "pending" };
+  const { baseUpdatedAt, ...parsedUpdateFields } = parsed.data;
+  const updateFields = { ...parsedUpdateFields } as typeof parsedUpdateFields & { delegationStatus?: "none" | "pending" };
   const unsetFields: Record<string, ""> = {};
   if (updateFields.delegatedTo === "") {
     delete updateFields.delegatedTo;
@@ -81,7 +82,9 @@ export async function PATCH(request: Request, { params }: Params) {
   try {
     const db = await connectWithRetry();
     const tasks = await getTasksCollection(db);
-    const existing = await tasks.findOne({ _id: new ObjectId(id), createdBy: auth.user.id }, { projection: { status: 1, priority: 1, title: 1, durationMinutes: 1 } });
+    const existing = await tasks.findOne({ _id: new ObjectId(id), createdBy: auth.user.id }, { projection: { status: 1, priority: 1, title: 1, durationMinutes: 1, updatedAt: 1 } });
+    if (!existing) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    if (baseUpdatedAt && existing.updatedAt !== baseUpdatedAt) return NextResponse.json({ error: "Task changed elsewhere; review it before saving this edit", conflict: true }, { status: 409 });
     if (updateFields.dependencies) {
       const dependencyError = await validateTaskDependencies(tasks, auth.user.id, id, updateFields.dependencies);
       if (dependencyError) return NextResponse.json({ error: dependencyError }, { status: 400 });

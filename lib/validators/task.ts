@@ -78,6 +78,7 @@ export const taskUpdateSchema = z.object({
   tags: z.array(tagSchema).max(50).optional(),
   delegatedTo: delegatedToSchema.optional(),
   delegatedPhone: delegatedPhoneSchema.optional(),
+  baseUpdatedAt: z.string().datetime().optional(),
 }).refine(
   (value) => Object.keys(value).length > 0,
   "At least one task field is required"

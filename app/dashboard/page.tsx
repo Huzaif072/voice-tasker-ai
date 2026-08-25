@@ -74,6 +74,7 @@ export default function DashboardPage() {
     updateTask.mutate({
       id,
       status: task.status === "completed" ? "pending" : "completed",
+      baseUpdatedAt: task.updatedAt,
     });
   }
 
@@ -166,7 +167,7 @@ export default function DashboardPage() {
         onSave={(data) => {
           if (!editingTask?._id) return;
           updateTask.mutate(
-            { id: editingTask._id, ...data },
+            { id: editingTask._id, ...data, baseUpdatedAt: editingTask.updatedAt },
             { onSuccess: () => setEditingTask(null) }
           );
         }}

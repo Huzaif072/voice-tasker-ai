@@ -33,12 +33,12 @@ const faqs = [
   {
     question: "How does VoiceTasker handle voice data?",
     answer:
-      "Voice commands may be sent to a speech-to-text service for transcription, and the resulting transcript and parsed intent may be stored with your voice-session history. Review the Privacy Policy for the current development data flow and retention details.",
+      "Voice commands may be sent to a speech-to-text service for transcription, and the resulting transcript and parsed intent may be stored with your voice-session history. The Privacy Policy describes the application data flow, optional providers, account controls, and deployment-specific retention responsibilities.",
   },
   {
-    question: "Is VoiceTasker AI free during early access?",
+    question: "How does VoiceTasker AI pricing work?",
     answer:
-      "The development version is currently presented as free during early access. Paid plans, usage limits, and final billing terms will be communicated before any paid service is activated.",
+      "The current repository does not include paid billing or payment processing. Any future commercial deployment must publish its pricing, usage limits, subscription terms, and refund policy before charging users.",
   },
 ];
 
@@ -56,7 +56,7 @@ export function FAQSection() {
             Everything you need to know
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-400">
-            Learn how the voice-first workflow, AI planning, privacy, and early access fit together.
+            Learn how the voice-first workflow, AI planning, privacy, and configured integrations fit together.
           </p>
         </div>
 

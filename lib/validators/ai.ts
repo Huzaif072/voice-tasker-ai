@@ -13,6 +13,10 @@ export const deadlineInputSchema = z.object({
   taskId: z.string().trim().regex(/^[a-f0-9]{24}$/i, "Invalid task ID"),
 }).strict();
 
+export const calendarEventInputSchema = z.object({
+  taskId: z.string().trim().regex(/^[a-f0-9]{24}$/i, "Invalid task ID"),
+}).strict();
+
 export const feedbackInputSchema = z.object({
   category: z.enum(["voice", "priority", "deadline", "summary"]),
   rating: z.enum(["positive", "negative"]),
@@ -27,4 +31,5 @@ export type DecomposeInput = z.infer<typeof decomposeInputSchema>;
 export type FollowupInput = z.infer<typeof followupInputSchema>;
 export type SummaryInput = z.infer<typeof summaryInputSchema>;
 export type FeedbackInput = z.infer<typeof feedbackInputSchema>;
+export type CalendarEventInput = z.infer<typeof calendarEventInputSchema>;
 export type DeadlineInput = z.infer<typeof deadlineInputSchema>;

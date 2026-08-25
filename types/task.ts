@@ -31,6 +31,8 @@ export interface Task {
   durationMinutes?: number;
   calendarQuery?: string;
   calendarLink?: string;
+  calendarEventId?: string;
+  calendarEventUrl?: string;
   subtasks: Subtask[];
   dependencies: string[];
   contextTriggers: ContextTrigger[];

@@ -7,6 +7,7 @@ import { GET as getProviderHealth } from "../app/api/health/providers/route";
 import { GET as getVoiceHistory } from "../app/api/voice/history/route";
 import { POST as postFeedback } from "../app/api/analytics/feedback/route";
 import { POST as postDeadline } from "../app/api/ai/deadline/route";
+import { POST as postCalendarEvent } from "../app/api/calendar/events/route";
 
 async function main() {
   const unauthenticated = new Request("http://localhost/api/account/reminders");
@@ -16,6 +17,7 @@ async function main() {
   assert.equal((await getVoiceHistory(new Request("http://localhost/api/voice/history"))).status, 401);
   assert.equal((await postFeedback(new Request("http://localhost/api/analytics/feedback", { method: "POST", body: JSON.stringify({ category: "voice", rating: "positive" }) }))).status, 401);
   assert.equal((await postDeadline(new Request("http://localhost/api/ai/deadline", { method: "POST", body: JSON.stringify({ taskId: "507f1f77bcf86cd799439011" }) }))).status, 401);
+  assert.equal((await postCalendarEvent(new Request("http://localhost/api/calendar/events", { method: "POST", body: JSON.stringify({ taskId: "507f1f77bcf86cd799439011" }) }))).status, 401);
   assert.equal((await deleteAccount(new Request("http://localhost/api/account", { method: "DELETE", body: JSON.stringify({ confirmation: "DELETE" }) }))).status, 401);
 
   const previousSecret = process.env.REMINDER_WORKER_SECRET;

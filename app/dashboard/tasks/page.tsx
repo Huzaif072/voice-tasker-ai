@@ -81,12 +81,13 @@ export default function TasksPage() {
               const tomorrow = new Date();
               tomorrow.setDate(tomorrow.getDate() + 1);
               tomorrow.setHours(9, 0, 0, 0);
-              updateTask.mutate({ id, dueDate: tomorrow.toISOString() });
+              const task = tasks.find((item) => item._id === id);
+              updateTask.mutate({ id, dueDate: tomorrow.toISOString(), baseUpdatedAt: task?.updatedAt });
             }}
             onToggle={(id) => {
               if (updateTask.isPending) return;
               const task = tasks.find((item) => item._id === id);
-              if (task) updateTask.mutate({ id, status: task.status === "completed" ? "pending" : "completed" });
+              if (task) updateTask.mutate({ id, status: task.status === "completed" ? "pending" : "completed", baseUpdatedAt: task.updatedAt });
             }}
             onDelete={(id) => {
               if (deleteTask.isPending) return;
@@ -123,7 +124,7 @@ export default function TasksPage() {
         }}
         onSave={(data) => {
           if (!editingTask?._id) return;
-          updateTask.mutate({ id: editingTask._id, ...data }, { onSuccess: () => setEditingTask(null) });
+          updateTask.mutate({ id: editingTask._id, ...data, baseUpdatedAt: editingTask.updatedAt }, { onSuccess: () => setEditingTask(null) });
         }}
       />
     </motion.div>

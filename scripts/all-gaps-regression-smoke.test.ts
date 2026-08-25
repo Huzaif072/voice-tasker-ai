@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { delegationSchema } from "@/lib/validators/delegation";
-import { taskSchema } from "@/lib/validators/task";
+import { taskSchema, taskUpdateSchema } from "@/lib/validators/task";
 import { basicRegexIntent } from "@/lib/groq/intent-parser";
 import { suggestDeadline, suggestPriority } from "@/lib/tasks/prioritize";
 import { buildCalendarComposeLink } from "@/lib/calendar/link";
-import { feedbackInputSchema } from "@/lib/validators/ai";
+import { calendarEventInputSchema, feedbackInputSchema } from "@/lib/validators/ai";
+import { getGoogleAuthUrl } from "@/lib/auth/google";
 import { decryptSecret, encryptSecret } from "@/lib/auth/secrets";
 import type { Task } from "@/types/task";
 
@@ -47,6 +48,21 @@ assert.equal(typeof deadline.dueDate, "string");
 assert.match(buildCalendarComposeLink("Review report", new Date().toISOString()) ?? "", /^https:\/\/calendar\.google\.com\/calendar\/render\?/);
 assert.equal(feedbackInputSchema.safeParse({ category: "voice", rating: "positive" }).success, true);
 assert.equal(feedbackInputSchema.safeParse({ category: "voice", rating: "maybe" }).success, false);
+assert.equal(calendarEventInputSchema.safeParse({ taskId: "507f1f77bcf86cd799439011" }).success, true);
+assert.equal(taskUpdateSchema.safeParse({ priority: "high", baseUpdatedAt: new Date().toISOString() }).success, true);
+const previousGoogleCalendar = process.env.GOOGLE_CALENDAR_ENABLED;
+const previousGoogleWrite = process.env.GOOGLE_CALENDAR_WRITE_ENABLED;
+const previousClientId = process.env.GOOGLE_CLIENT_ID;
+const previousNextAuthUrl = process.env.NEXTAUTH_URL;
+process.env.GOOGLE_CALENDAR_ENABLED = "true";
+process.env.GOOGLE_CALENDAR_WRITE_ENABLED = "true";
+process.env.GOOGLE_CLIENT_ID = "client-id";
+process.env.NEXTAUTH_URL = "http://localhost:3000";
+assert.match(decodeURIComponent(getGoogleAuthUrl("state")).toString(), /https:\/\/www\.googleapis\.com\/auth\/calendar(?!\.readonly)/);
+if (previousGoogleCalendar === undefined) delete process.env.GOOGLE_CALENDAR_ENABLED; else process.env.GOOGLE_CALENDAR_ENABLED = previousGoogleCalendar;
+if (previousGoogleWrite === undefined) delete process.env.GOOGLE_CALENDAR_WRITE_ENABLED; else process.env.GOOGLE_CALENDAR_WRITE_ENABLED = previousGoogleWrite;
+if (previousClientId === undefined) delete process.env.GOOGLE_CLIENT_ID; else process.env.GOOGLE_CLIENT_ID = previousClientId;
+if (previousNextAuthUrl === undefined) delete process.env.NEXTAUTH_URL; else process.env.NEXTAUTH_URL = previousNextAuthUrl;
 
 const encrypted = encryptSecret("calendar-token");
 assert.equal(decryptSecret(encrypted), "calendar-token");

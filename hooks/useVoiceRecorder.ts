@@ -192,7 +192,7 @@ export function useVoiceRecorder() {
   return { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, startNewConversation, supported };
 }
 
-export function useVoiceRecognition() {
+export function useVoiceRecognition(onFinal?: (text: string) => void) {
   const dispatch = useDispatch();
   const recognitionRef = useRef<InstanceType<NonNullable<typeof window.SpeechRecognition>> | null>(null);
 
@@ -210,13 +210,16 @@ export function useVoiceRecognition() {
         const t = event.results[i][0].transcript;
         if (event.results[i].isFinal) final += t; else interim += t;
       }
-      if (final) dispatch(setTranscript(final));
+      if (final) {
+        dispatch(setTranscript(final));
+        onFinal?.(final.trim());
+      }
       dispatch(setInterimTranscript(interim));
     };
     recognitionRef.current = recognition;
-  }, [dispatch]);
+  }, [dispatch, onFinal]);
 
   const start = useCallback(() => recognitionRef.current?.start(), []);
   const stop = useCallback(() => recognitionRef.current?.stop(), []);
-  return { start, stop };
+  return { start, stop, supported: Boolean(typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition)) };
 }

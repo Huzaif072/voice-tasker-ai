@@ -9,7 +9,7 @@ import { VoiceIntentPreview } from "@/components/voice/VoiceIntentPreview";
 import { VoiceWaveform } from "@/components/voice/VoiceWaveform";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import { useVoiceRecorder, useVoiceRecognition } from "@/hooks/useVoiceRecorder";
 import type { RootState } from "@/store";
 import { setParsedIntent } from "@/store/slices/voiceSlice";
 import { VoiceCommandHistory } from "@/components/voice/VoiceCommandHistory";
@@ -22,6 +22,8 @@ export default function VoicePage() {
   const { data: history = [] } = useVoiceHistory();
   const { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, startNewConversation, supported } = useVoiceRecorder();
   const [textInput, setTextInput] = useState("");
+  const [liveListening, setLiveListening] = useState(false);
+  const { start: startLiveRecognition, stop: stopLiveRecognition, supported: liveSupported } = useVoiceRecognition((text) => { if (text) void submitText(text); });
 
   function dismissPreview() { dispatch(setParsedIntent(null)); }
 
@@ -34,8 +36,9 @@ export default function VoicePage() {
       </div>
 
       <div className="flex flex-col items-center gap-6 py-8">
-        <VoiceWaveform active={isRecording} bars={16} className="h-20" />
+        <VoiceWaveform active={isRecording || liveListening} bars={16} className="h-20" />
         <VoiceMicButton isRecording={isRecording} isProcessing={isProcessing} onClick={() => (isRecording ? stopRecording() : startRecording())} size="lg" />
+        {liveSupported ? <Button type="button" variant={liveListening ? "primary" : "secondary"} onClick={() => { if (liveListening) { stopLiveRecognition(); setLiveListening(false); } else { startLiveRecognition(); setLiveListening(true); } }} disabled={isProcessing}>{liveListening ? "Stop live voice" : "Use live voice"}</Button> : null}
         {!supported ? <p className="text-sm text-amber-400" role="status">Microphone unavailable. Use text input below.</p> : null}
         {isProcessing ? <Button type="button" variant="ghost" onClick={cancelProcessing}>Cancel processing</Button> : null}
         {conversationId ? <p className="text-xs text-slate-600" aria-label="Conversation is active">Conversation active</p> : null}

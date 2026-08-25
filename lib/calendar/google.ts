@@ -40,6 +40,16 @@ async function getAccessToken(user: UserDocument, users: Collection<UserDocument
   return tokens.access_token;
 }
 
+export async function createCalendarEvent(user: UserDocument, users: Collection<UserDocument>, event: { summary: string; description?: string; start: string; end: string }) {
+  if (process.env.GOOGLE_CALENDAR_ENABLED !== "true" || process.env.GOOGLE_CALENDAR_WRITE_ENABLED !== "true") return null;
+  const accessToken = await getAccessToken(user, users);
+  if (!accessToken) return null;
+  const response = await fetch(GOOGLE_EVENTS_URL, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ summary: event.summary, description: event.description, start: { dateTime: event.start }, end: { dateTime: event.end } }), signal: AbortSignal.timeout(10_000) });
+  if (!response.ok) return null;
+  const created = await response.json() as { id?: string; htmlLink?: string };
+  return created.id ? { id: created.id, url: created.htmlLink } : null;
+}
+
 export async function getUpcomingCalendarEvents(user: UserDocument, users: Collection<UserDocument>, from = new Date(), hours = 24) {
   if (process.env.GOOGLE_CALENDAR_ENABLED !== "true") return [];
   const accessToken = await getAccessToken(user, users);
