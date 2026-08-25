@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "../lib/auth/middleware";
-import { decomposeInputSchema, followupInputSchema } from "../lib/validators/ai";
+import { decomposeInputSchema, followupInputSchema, summaryInputSchema } from "../lib/validators/ai";
 
 async function main() {
   const unauthenticated = await requireAuth(new Request("http://localhost/api/tasks"));
@@ -23,6 +23,16 @@ async function main() {
   }
   if (followupInputSchema.safeParse({ taskId: "" }).success) {
     throw new Error("AI follow-up must reject an empty task ID");
+  }
+  if (summaryInputSchema.safeParse({ period: "monthly" }).success) {
+    throw new Error("AI summaries must reject unsupported periods");
+  }
+  const defaultSummary = summaryInputSchema.safeParse({});
+  if (!defaultSummary.success || defaultSummary.data.period !== "daily") {
+    throw new Error("AI summaries must default to the daily period");
+  }
+  if (summaryInputSchema.safeParse({ period: "daily", extra: true }).success) {
+    throw new Error("AI summaries must reject unknown request fields");
   }
 
   console.log("PASS: authenticated route guards and AI request contracts reject invalid requests safely.");

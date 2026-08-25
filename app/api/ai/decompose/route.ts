@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/middleware";
 import { decomposeTask } from "@/lib/groq/task-decomposer";
 import { decomposeInputSchema } from "@/lib/validators/ai";
+import { checkAiDecomposeRateLimit, getRetryAfterSeconds } from "@/lib/auth/rate-limit";
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
@@ -17,6 +18,14 @@ export async function POST(request: Request) {
   const parsed = decomposeInputSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid decomposition request" }, { status: 400 });
+  }
+
+  const limit = await checkAiDecomposeRateLimit(auth.user.id);
+  if (!limit.success) {
+    return NextResponse.json(
+      { error: "Too many decomposition requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(getRetryAfterSeconds("ai-decompose")) } },
+    );
   }
 
   try {

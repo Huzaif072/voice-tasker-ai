@@ -4,12 +4,23 @@ import { connectWithRetry } from "@/lib/db/mongodb";
 import { getTasksCollection } from "@/lib/db/models/Task";
 import { generateSummary } from "@/lib/groq/summarizer";
 import { getCached, setCache } from "@/lib/redis/ratelimit";
+import { summaryInputSchema } from "@/lib/validators/ai";
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
 
-  const { period = "daily" } = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+  const parsed = summaryInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid summary period" }, { status: 400 });
+  }
+  const { period } = parsed.data;
   const cacheKey = `ai-summary:${auth.user.id}:${period}`;
   const cached = await getCached<string>(cacheKey);
   if (cached) return NextResponse.json({ summary: cached, period });

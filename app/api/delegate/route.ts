@@ -5,6 +5,7 @@ import { connectWithRetry } from "@/lib/db/mongodb";
 import { getTasksCollection } from "@/lib/db/models/Task";
 import { sendDelegationEmail } from "@/lib/notifications/email";
 import { delegationSchema } from "@/lib/validators/delegation";
+import { checkDelegationRateLimit, getRetryAfterSeconds } from "@/lib/auth/rate-limit";
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
@@ -28,6 +29,13 @@ export async function POST(request: Request) {
   const { taskId, email } = parsed.data;
   if (!ObjectId.isValid(taskId)) {
     return NextResponse.json({ error: "Invalid task ID" }, { status: 400 });
+  }
+  const limit = await checkDelegationRateLimit(auth.user.id, taskId, email);
+  if (!limit.success) {
+    return NextResponse.json(
+      { error: "Too many delegation requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(getRetryAfterSeconds("delegation")) } },
+    );
   }
 
   try {

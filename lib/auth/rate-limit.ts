@@ -7,6 +7,12 @@ const LOGIN_ADDRESS_LIMIT = 30;
 const RESET_WINDOW_SECONDS = 15 * 60;
 const RESET_EMAIL_LIMIT = 3;
 const RESET_ADDRESS_LIMIT = 10;
+const AI_DECOMPOSE_WINDOW_SECONDS = 60;
+const AI_DECOMPOSE_LIMIT = 10;
+const DELEGATION_WINDOW_SECONDS = 60;
+const DELEGATION_LIMIT = 10;
+const DELEGATION_TARGET_WINDOW_SECONDS = 60 * 60;
+const DELEGATION_TARGET_LIMIT = 3;
 
 function getClientAddress(request: Request) {
   const forwardedFor = request.headers.get("x-forwarded-for");
@@ -36,8 +42,30 @@ async function checkBuckets(
   };
 }
 
-export function getRetryAfterSeconds(scope: "login" | "password-reset") {
-  return scope === "login" ? LOGIN_WINDOW_SECONDS : RESET_WINDOW_SECONDS;
+export function getRetryAfterSeconds(scope: "login" | "password-reset" | "ai-decompose" | "delegation") {
+  if (scope === "login") return LOGIN_WINDOW_SECONDS;
+  if (scope === "password-reset") return RESET_WINDOW_SECONDS;
+  if (scope === "delegation") return DELEGATION_WINDOW_SECONDS;
+  return AI_DECOMPOSE_WINDOW_SECONDS;
+}
+
+export async function checkAiDecomposeRateLimit(userId: string) {
+  return rateLimit(`ai:decompose:${userId}`, AI_DECOMPOSE_LIMIT, AI_DECOMPOSE_WINDOW_SECONDS);
+}
+
+export async function checkDelegationRateLimit(userId: string, taskId: string, email: string) {
+  return checkBuckets([
+    {
+      key: `delegation:user:${userId}`,
+      limit: DELEGATION_LIMIT,
+      windowSeconds: DELEGATION_WINDOW_SECONDS,
+    },
+    {
+      key: `delegation:target:${userId}:${taskId}:${digest(email)}`,
+      limit: DELEGATION_TARGET_LIMIT,
+      windowSeconds: DELEGATION_TARGET_WINDOW_SECONDS,
+    },
+  ]);
 }
 
 export async function checkLoginRateLimit(request: Request, email: string) {

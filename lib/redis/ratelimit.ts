@@ -45,14 +45,26 @@ export async function setCache(key: string, value: unknown, ttlSeconds = 300): P
   }
 }
 
+const CACHE_DELETE_BATCH_SIZE = 100;
+
 export async function invalidateCache(pattern: string): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
   try {
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-    }
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, {
+        match: pattern,
+        count: CACHE_DELETE_BATCH_SIZE,
+      });
+      if (keys.length > 0) {
+        for (let index = 0; index < keys.length; index += CACHE_DELETE_BATCH_SIZE) {
+          const batch = keys.slice(index, index + CACHE_DELETE_BATCH_SIZE);
+          await redis.del(...batch);
+        }
+      }
+      cursor = nextCursor;
+    } while (cursor !== "0");
   } catch (error) {
     console.warn("[Redis] Cache invalidation unavailable", error);
   }
