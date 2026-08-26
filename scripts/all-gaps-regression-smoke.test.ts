@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { delegationSchema } from "@/lib/validators/delegation";
 import { taskSchema, taskUpdateSchema } from "@/lib/validators/task";
 import { basicRegexIntent } from "@/lib/groq/intent-parser";
+import { GROQ_MODEL } from "@/lib/groq/client";
 import { suggestDeadline, suggestPriority } from "@/lib/tasks/prioritize";
 import { buildCalendarComposeLink } from "@/lib/calendar/link";
 import { calendarEventInputSchema, feedbackInputSchema } from "@/lib/validators/ai";
@@ -26,6 +27,7 @@ assert.equal(delegationSchema.safeParse({ taskId: "507f1f77bcf86cd799439011" }).
 
 const intent = basicRegexIntent("Create a planning task for 90 minutes");
 assert.equal(intent.durationMinutes, 90);
+assert.equal(["llama-3.1-8b-instant", "llama-3.3-70b-versatile"].includes(GROQ_MODEL), false);
 
 const task: Task = {
   _id: "507f1f77bcf86cd799439011",

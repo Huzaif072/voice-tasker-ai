@@ -13,5 +13,8 @@ export function getGroqClient(): Groq {
   return groqClient;
 }
 
-export const GROQ_MODEL = "llama-3.3-70b-versatile";
+export const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
+const RETIRED_GROQ_MODELS = new Set(["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]);
+const configuredGroqModel = process.env.GROQ_MODEL?.trim();
+export const GROQ_MODEL = configuredGroqModel && !RETIRED_GROQ_MODELS.has(configuredGroqModel) ? configuredGroqModel : DEFAULT_GROQ_MODEL;
 export const WHISPER_MODEL = "whisper-large-v3";
