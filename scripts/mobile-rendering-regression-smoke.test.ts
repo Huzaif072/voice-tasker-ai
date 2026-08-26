@@ -13,6 +13,7 @@ async function main() {
   const features = await read("components/landing/FeaturesGrid.tsx");
   const cta = await read("components/landing/CTASection.tsx");
   const pwaStatus = await read("components/dashboard/PwaStatus.tsx");
+  const prioritySuggestions = await read("components/dashboard/PrioritySuggestions.tsx");
   const input = await read("components/ui/Input.tsx");
   const signupForm = await read("components/auth/SignupForm.tsx");
   const serviceWorker = await read("public/push-sw.js");
@@ -31,12 +32,17 @@ async function main() {
   assert.match(pwaStatus, /bottom-20/);
   assert.match(pwaStatus, /Dismiss install message/);
   assert.match(pwaStatus, /setInstallDismissed/);
+  assert.match(prioritySuggestions, /requestAiDeadline/);
+  assert.match(prioritySuggestions, /AI was unavailable/);
+  assert.match(prioritySuggestions, /Ask AI failed/);
+  assert.equal((prioritySuggestions.match(/<FeedbackButtons category="priority" \/>/g) ?? []).length, 1);
+  assert.doesNotMatch(prioritySuggestions, /category="deadline"/);
   assert.match(input, /min-h-11 min-w-11/);
   assert.match(input, /touch-manipulation/);
   assert.match(input, /onTouchEnd/);
   assert.match(signupForm, /onInput=/);
   assert.match(serviceWorker, /voicetasker-static-v4/);
-  console.log("PASS: mobile rendering, auth controls, service-worker refresh, and non-overlapping PWA banner contracts are covered");
+  console.log("PASS: mobile rendering, auth controls, service-worker refresh, PWA banner, and dashboard feedback/AI action contracts are covered");
 }
 
 void main().catch((error) => {
