@@ -40,7 +40,7 @@ export function HeroSection() {
 
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2">
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
         >
@@ -81,7 +81,7 @@ export function HeroSection() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.2 }}
           className="relative"

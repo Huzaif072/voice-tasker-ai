@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -14,8 +14,14 @@ function getPasswordStrength(password: string) {
 
 export function SignupForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const returnTo = getSafeReturnTo(searchParams.get("returnTo"));
+  const [returnTo, setReturnTo] = useState("/");
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const searchParams = new URLSearchParams(window.location.search);
+      setReturnTo(getSafeReturnTo(searchParams.get("returnTo")));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

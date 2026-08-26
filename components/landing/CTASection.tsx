@@ -9,7 +9,7 @@ export function CTASection() {
   return (
     <section className="px-6 py-20 lg:px-8 xl:py-24">
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
+        initial={false}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl px-8 py-16 text-center"

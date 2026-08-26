@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OAuthButtons, AuthDivider, AuthFooterLink } from "./OAuthButtons";
@@ -10,9 +10,16 @@ import { getSafeReturnTo } from "@/lib/auth/redirect";
 
 export function LoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const returnTo = getSafeReturnTo(searchParams.get("returnTo"));
-  const verificationStatus = searchParams.get("verified");
+  const [returnTo, setReturnTo] = useState("/");
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const searchParams = new URLSearchParams(window.location.search);
+      setReturnTo(getSafeReturnTo(searchParams.get("returnTo")));
+      setVerificationStatus(searchParams.get("verified"));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   const verificationMessage = verificationStatus === "1"
     ? "Your email has been verified successfully. You can now sign in."
     : verificationStatus === "0"

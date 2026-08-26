@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getSafeReturnTo } from "@/lib/auth/redirect";
 
 const APPLE_SIGN_IN_ENABLED = process.env.NEXT_PUBLIC_APPLE_SIGN_IN_ENABLED === "true";
@@ -18,11 +17,17 @@ const oauthMessages: Record<string, string> = {
 };
 
 export function OAuthButtons({ returnTo }: { returnTo?: string } = {}) {
-  const searchParams = useSearchParams();
   const [loadingProvider, setLoadingProvider] = useState<"google" | "apple" | null>(null);
-  const errorCode = searchParams.get("error");
-  const oauthError = errorCode ? oauthMessages[errorCode] ?? "Sign-in failed. Please try again." : "";
-  const safeReturnTo = getSafeReturnTo(returnTo ?? searchParams.get("returnTo"));
+  const [queryState, setQueryState] = useState({ error: "", returnTo: "" });
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const searchParams = new URLSearchParams(window.location.search);
+      setQueryState({ error: searchParams.get("error") ?? "", returnTo: searchParams.get("returnTo") ?? "" });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const oauthError = queryState.error ? oauthMessages[queryState.error] ?? "Sign-in failed. Please try again." : "";
+  const safeReturnTo = getSafeReturnTo(returnTo ?? queryState.returnTo);
 
   function startOAuth(provider: "google" | "apple") {
     setLoadingProvider(provider);
