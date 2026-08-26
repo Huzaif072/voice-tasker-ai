@@ -12,6 +12,7 @@ async function main() {
   const hero = await read("components/landing/HeroSection.tsx");
   const features = await read("components/landing/FeaturesGrid.tsx");
   const cta = await read("components/landing/CTASection.tsx");
+  const pwaStatus = await read("components/dashboard/PwaStatus.tsx");
 
   assert.match(login, /Suspense fallback=/);
   assert.match(signup, /Suspense fallback=/);
@@ -21,7 +22,9 @@ async function main() {
   assert.match(hero, /initial=\{false\}/);
   assert.match(features, /initial=\{false\}/);
   assert.match(cta, /initial=\{false\}/);
-  console.log("PASS: mobile auth fallback and server-visible landing content contracts are covered");
+  assert.match(pwaStatus, /md:left-64/);
+  assert.match(pwaStatus, /bottom-20/);
+  console.log("PASS: mobile rendering and non-overlapping PWA banner contracts are covered");
 }
 
 void main().catch((error) => {
