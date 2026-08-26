@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OAuthButtons, AuthDivider, AuthFooterLink } from "./OAuthButtons";
@@ -9,7 +9,6 @@ import Link from "next/link";
 import { getSafeReturnTo } from "@/lib/auth/redirect";
 
 export function LoginForm() {
-  const router = useRouter();
   const [returnTo, setReturnTo] = useState("/");
   const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
   useEffect(() => {
@@ -48,7 +47,8 @@ export function LoginForm() {
         setVerificationRequired(Boolean(data.requiresEmailVerification));
         throw new Error(data.error ?? "Login failed");
       }
-      router.push(returnTo);
+      // A full navigation is more reliable than a client transition on older iOS WebKit.
+      window.location.assign(returnTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -100,6 +100,7 @@ export function LoginForm() {
             showToggle
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onInput={(e) => setPassword(e.currentTarget.value)}
             autoComplete="current-password"
             className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
             labelClassName="text-slate-300"

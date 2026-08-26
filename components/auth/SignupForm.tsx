@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -13,7 +12,6 @@ function getPasswordStrength(password: string) {
 }
 
 export function SignupForm() {
-  const router = useRouter();
   const [returnTo, setReturnTo] = useState("/");
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -58,9 +56,12 @@ export function SignupForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Signup failed");
       if (data.requiresEmailVerification) {
-        router.push(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}&returnTo=${encodeURIComponent(returnTo)}`);
+        const verificationUrl = `/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}&returnTo=${encodeURIComponent(returnTo)}`;
+        // A full navigation is more reliable than a client transition on older iOS WebKit.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.assign(verificationUrl);
       } else {
-        router.push(returnTo);
+        window.location.assign(returnTo);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
@@ -107,6 +108,7 @@ export function SignupForm() {
             showToggle
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onInput={(e) => setPassword(e.currentTarget.value)}
             autoComplete="new-password"
             aria-describedby="signup-password-requirements signup-password-strength"
             className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"
@@ -139,6 +141,7 @@ export function SignupForm() {
             showToggle
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
+            onInput={(e) => setConfirmPassword(e.currentTarget.value)}
             autoComplete="new-password"
             error={confirmPassword && password !== confirmPassword ? "Passwords do not match." : undefined}
             className="border-slate-600 bg-slate-800 text-slate-100 placeholder:text-slate-500"

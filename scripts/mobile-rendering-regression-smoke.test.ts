@@ -13,6 +13,9 @@ async function main() {
   const features = await read("components/landing/FeaturesGrid.tsx");
   const cta = await read("components/landing/CTASection.tsx");
   const pwaStatus = await read("components/dashboard/PwaStatus.tsx");
+  const input = await read("components/ui/Input.tsx");
+  const signupForm = await read("components/auth/SignupForm.tsx");
+  const serviceWorker = await read("public/push-sw.js");
 
   assert.match(login, /Suspense fallback=/);
   assert.match(signup, /Suspense fallback=/);
@@ -24,7 +27,11 @@ async function main() {
   assert.match(cta, /initial=\{false\}/);
   assert.match(pwaStatus, /md:left-64/);
   assert.match(pwaStatus, /bottom-20/);
-  console.log("PASS: mobile rendering and non-overlapping PWA banner contracts are covered");
+  assert.match(input, /min-h-11 min-w-11/);
+  assert.match(input, /touch-manipulation/);
+  assert.match(signupForm, /onInput=/);
+  assert.match(serviceWorker, /voicetasker-static-v3/);
+  console.log("PASS: mobile rendering, auth controls, service-worker refresh, and non-overlapping PWA banner contracts are covered");
 }
 
 void main().catch((error) => {
