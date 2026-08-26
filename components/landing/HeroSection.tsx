@@ -30,11 +30,7 @@ export function HeroSection() {
         <div className="absolute left-1/2 top-0 h-[600px] w-[800px] -translate-x-1/2 rounded-full bg-violet-600/20 blur-[120px]" />
         <div className="absolute right-0 top-1/3 h-[400px] w-[400px] rounded-full bg-sky-400/10 blur-[100px]" />
         <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: `linear-gradient(#F8FAFC 1px, transparent 1px), linear-gradient(90deg, #F8FAFC 1px, transparent 1px)`,
-            backgroundSize: "48px 48px",
-          }}
+          className="absolute inset-0 bg-[linear-gradient(#F8FAFC_1px,transparent_1px),linear-gradient(90deg,#F8FAFC_1px,transparent_1px)] opacity-[0.03] [background-size:48px_48px]"
         />
       </div>
 

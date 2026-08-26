@@ -90,11 +90,7 @@ export default function LandingPage() {
               {useCases.map((uc) => (
                 <div
                   key={uc.title}
-                  className="group rounded-xl border border-slate-700/50 bg-slate-800/50 p-6 transition-all hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-600/10"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(135deg, transparent 0%, rgba(124,58,237,0.05) 100%)",
-                  }}
+                  className="group rounded-xl border border-slate-700/50 bg-[linear-gradient(135deg,transparent_0%,rgba(124,58,237,0.05)_100%)] p-6 transition-all hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-600/10"
                 >
                   <h3 className="text-lg font-semibold text-slate-100">{uc.title}</h3>
                   <p className="mt-2 text-slate-400">{uc.desc}</p>

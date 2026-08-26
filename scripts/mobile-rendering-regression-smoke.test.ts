@@ -12,6 +12,7 @@ async function main() {
   const hero = await read("components/landing/HeroSection.tsx");
   const features = await read("components/landing/FeaturesGrid.tsx");
   const cta = await read("components/landing/CTASection.tsx");
+  const landingPage = await read("app/page.tsx");
   const pwaStatus = await read("components/dashboard/PwaStatus.tsx");
   const prioritySuggestions = await read("components/dashboard/PrioritySuggestions.tsx");
   const tasksPage = await read("app/dashboard/tasks/page.tsx");
@@ -32,6 +33,10 @@ async function main() {
   assert.match(hero, /initial=\{false\}/);
   assert.match(features, /initial=\{false\}/);
   assert.match(cta, /initial=\{false\}/);
+  assert.match(hero, /bg-\[linear-gradient/);
+  assert.match(cta, /bg-\[linear-gradient/);
+  assert.doesNotMatch(cta, /style=\{\{/);
+  assert.doesNotMatch(landingPage, /backgroundImage/);
   assert.match(pwaStatus, /md:right-8/);
   assert.match(pwaStatus, /md:bottom-24/);
   assert.match(pwaStatus, /safe-area-inset-bottom/);
@@ -66,7 +71,7 @@ async function main() {
   const localWhisper = await read("lib/whisper-cpp/transcribe.ts");
   assert.match(localWhisper, /"-l"/);
   assert.match(localWhisper, /language/);
-  console.log("PASS: mobile rendering, auth controls, service-worker refresh, PWA banner, dashboard feedback/AI action, transcription accuracy, and delete-confirmation contracts are covered");
+  console.log("PASS: mobile rendering, auth controls, service-worker refresh, PWA banner, dashboard feedback/AI action, transcription accuracy, delete-confirmation, and hydration-safe landing contracts are covered");
 }
 
 void main().catch((error) => {
