@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDashboardSearch } from "@/hooks/useDashboardSearch";
 import type { Task } from "@/types/task";
 import { PrioritySuggestions } from "@/components/dashboard/PrioritySuggestions";
+import { TaskDeleteModal } from "@/components/dashboard/TaskDeleteModal";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -24,6 +25,7 @@ export default function DashboardPage() {
   const [filter, setFilter] = useState<TaskFilter>("All");
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [deletingTask, setDeletingTask] = useState<{ id: string; title: string } | null>(null);
   const { search } = useDashboardSearch();
 
   const filtered = useMemo(() => {
@@ -80,17 +82,21 @@ export default function DashboardPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-slate-100">
-          Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}!
-        </h2>
-        <p className="text-slate-400">
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-400/80">Today in your workspace</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-100 sm:text-3xl">
+            Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}.
+          </h2>
+          <p className="mt-1 text-sm text-slate-400">
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
+        </div>
+        <p className="max-w-xs text-sm leading-6 text-slate-500 sm:text-right">Keep your priorities visible and turn the next thought into a clear action.</p>
       </div>
 
       <DashboardStats
@@ -138,18 +144,14 @@ export default function DashboardPage() {
               onDelete={(id) => {
                 if (deleteTask.isPending) return;
                 const task = tasks.find((item) => item._id === id);
-                if (window.confirm(`Delete${task?.title ? ` “${task.title}”` : " this task"}?`)) {
-                  deleteTask.mutate(id);
-                }
+                if (!task?._id) return;
+                deleteTask.reset();
+                setDeletingTask({ id: task._id, title: task.title });
               }}
             />
           )}
         </div>
-        {updateTask.isError || deleteTask.isError ? (
-          <p className="mt-3 text-sm text-red-400" role="alert">
-            {updateTask.isError ? "Unable to update that task." : "Unable to delete that task."}
-          </p>
-        ) : null}
+        {updateTask.isError ? <p className="mt-3 text-sm text-red-400" role="alert">Unable to update that task.</p> : null}
       </div>
 
       <TaskEditorModal
@@ -170,6 +172,23 @@ export default function DashboardPage() {
             { id: editingTask._id, ...data, baseUpdatedAt: editingTask.updatedAt },
             { onSuccess: () => setEditingTask(null) }
           );
+        }}
+      />
+
+      <TaskDeleteModal
+        open={Boolean(deletingTask)}
+        taskTitle={deletingTask?.title ?? "this task"}
+        deleting={deleteTask.isPending}
+        error={deleteTask.isError ? (deleteTask.error instanceof Error ? deleteTask.error.message : "Unable to delete that task.") : null}
+        onClose={() => {
+          if (!deleteTask.isPending) {
+            deleteTask.reset();
+            setDeletingTask(null);
+          }
+        }}
+        onConfirm={() => {
+          if (!deletingTask || deleteTask.isPending) return;
+          deleteTask.mutate(deletingTask.id, { onSuccess: () => setDeletingTask(null) });
         }}
       />
 
