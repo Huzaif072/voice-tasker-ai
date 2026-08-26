@@ -47,7 +47,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           {isPassword ? (
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() => setShowPassword((visible) => !visible)}
+              onTouchEnd={(event) => {
+                event.preventDefault();
+                setShowPassword((visible) => !visible);
+              }}
               className="absolute right-1 top-1/2 z-10 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 touch-manipulation hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
               aria-label={showPassword ? "Hide password" : "Show password"}
               aria-pressed={showPassword}

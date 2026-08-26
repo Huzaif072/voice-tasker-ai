@@ -31,8 +31,9 @@ async function main() {
   assert.match(pwaStatus, /setInstallDismissed/);
   assert.match(input, /min-h-11 min-w-11/);
   assert.match(input, /touch-manipulation/);
+  assert.match(input, /onTouchEnd/);
   assert.match(signupForm, /onInput=/);
-  assert.match(serviceWorker, /voicetasker-static-v3/);
+  assert.match(serviceWorker, /voicetasker-static-v4/);
   console.log("PASS: mobile rendering, auth controls, service-worker refresh, and non-overlapping PWA banner contracts are covered");
 }
 

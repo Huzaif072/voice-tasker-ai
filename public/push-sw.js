@@ -1,6 +1,6 @@
 const QUEUE_DB = "voicetasker-offline";
 const QUEUE_STORE = "mutations";
-const STATIC_CACHE = "voicetasker-static-v3";
+const STATIC_CACHE = "voicetasker-static-v4";
 
 function openQueue() {
   return new Promise((resolve, reject) => {
