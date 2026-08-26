@@ -9,12 +9,12 @@ export function PwaStatus() {
   const [installDismissed, setInstallDismissed] = useState(false);
   const showInstall = online && canInstall && !installDismissed;
   if (!showInstall && online && pendingMutations === 0 && !hasConflict && !hasFailedReplay) return null;
-  return <div className="fixed bottom-20 right-4 z-50 max-w-sm space-y-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 shadow-lg sm:bottom-4 md:bottom-8 md:right-32" role="status">
+  return <div className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] right-4 z-50 w-[calc(100vw-2rem)] max-w-sm space-y-2 rounded-xl border border-slate-700/80 bg-slate-800/95 px-3 py-2.5 text-xs text-slate-200 shadow-2xl shadow-slate-950/30 backdrop-blur-md sm:bottom-20 sm:right-5 md:bottom-24 md:right-8 md:w-auto" role="status">
     {showInstall ? (
-      <div className="flex items-center gap-3">
-        <span className="flex-1">VoiceTasker can be installed</span>
-        <button type="button" onClick={() => void install()} className="rounded-md bg-violet-600 px-2 py-1 text-white hover:bg-violet-500">Install</button>
-        <button type="button" onClick={() => setInstallDismissed(true)} className="flex min-h-8 min-w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-700 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400" aria-label="Dismiss install message" title="Dismiss install message">
+      <div className="flex items-center gap-2.5">
+        <span className="min-w-0 flex-1 font-medium leading-5">VoiceTasker can be installed</span>
+        <button type="button" onClick={() => void install()} className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 font-medium text-white shadow-sm shadow-violet-950/30 transition-colors hover:bg-violet-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-300">Install</button>
+        <button type="button" onClick={() => setInstallDismissed(true)} className="flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-700 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400" aria-label="Dismiss install message" title="Dismiss install message">
           <X aria-hidden="true" className="h-4 w-4" />
         </button>
       </div>

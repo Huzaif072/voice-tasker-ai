@@ -25,7 +25,9 @@ async function main() {
   assert.match(hero, /initial=\{false\}/);
   assert.match(features, /initial=\{false\}/);
   assert.match(cta, /initial=\{false\}/);
-  assert.match(pwaStatus, /md:right-32/);
+  assert.match(pwaStatus, /md:right-8/);
+  assert.match(pwaStatus, /md:bottom-24/);
+  assert.match(pwaStatus, /safe-area-inset-bottom/);
   assert.match(pwaStatus, /bottom-20/);
   assert.match(pwaStatus, /Dismiss install message/);
   assert.match(pwaStatus, /setInstallDismissed/);
