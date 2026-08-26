@@ -14,6 +14,8 @@ async function main() {
   const cta = await read("components/landing/CTASection.tsx");
   const pwaStatus = await read("components/dashboard/PwaStatus.tsx");
   const prioritySuggestions = await read("components/dashboard/PrioritySuggestions.tsx");
+  const tasksPage = await read("app/dashboard/tasks/page.tsx");
+  const taskDeleteModal = await read("components/dashboard/TaskDeleteModal.tsx");
   const input = await read("components/ui/Input.tsx");
   const signupForm = await read("components/auth/SignupForm.tsx");
   const serviceWorker = await read("public/push-sw.js");
@@ -41,6 +43,11 @@ async function main() {
   assert.match(prioritySuggestions, /Ask AI failed/);
   assert.equal((prioritySuggestions.match(/<FeedbackButtons category="priority" \/>/g) ?? []).length, 1);
   assert.doesNotMatch(prioritySuggestions, /category="deadline"/);
+  assert.match(tasksPage, /TaskDeleteModal/);
+  assert.doesNotMatch(tasksPage, /window\.confirm/);
+  assert.match(taskDeleteModal, /Delete task\?/);
+  assert.match(taskDeleteModal, /This action cannot be undone/);
+  assert.match(taskDeleteModal, /onConfirm/);
   assert.match(input, /min-h-11 min-w-11/);
   assert.match(input, /touch-manipulation/);
   assert.match(input, /onTouchEnd/);
@@ -59,7 +66,7 @@ async function main() {
   const localWhisper = await read("lib/whisper-cpp/transcribe.ts");
   assert.match(localWhisper, /"-l"/);
   assert.match(localWhisper, /language/);
-  console.log("PASS: mobile rendering, auth controls, service-worker refresh, PWA banner, dashboard feedback/AI action, and transcription accuracy contracts are covered");
+  console.log("PASS: mobile rendering, auth controls, service-worker refresh, PWA banner, dashboard feedback/AI action, transcription accuracy, and delete-confirmation contracts are covered");
 }
 
 void main().catch((error) => {

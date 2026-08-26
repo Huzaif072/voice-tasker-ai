@@ -8,11 +8,13 @@ import { usePaginatedTasks, useUpdateTask, useDeleteTask } from "@/hooks/useTask
 import type { Task } from "@/types/task";
 import { useDashboardSearch } from "@/hooks/useDashboardSearch";
 import { TaskEditorModal } from "@/components/dashboard/TaskEditorModal";
+import { TaskDeleteModal } from "@/components/dashboard/TaskDeleteModal";
 
 export default function TasksPage() {
   const [filter, setFilter] = useState<TaskFilter>("All");
   const [page, setPage] = useState(1);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [deletingTask, setDeletingTask] = useState<{ id: string; title: string } | null>(null);
   const { search } = useDashboardSearch();
   const taskPageQuery = usePaginatedTasks({
     page: search.trim() ? 1 : page,
@@ -93,17 +95,15 @@ export default function TasksPage() {
             onDelete={(id) => {
               if (deleteTask.isPending) return;
               const task = tasks.find((item) => item._id === id);
-              if (window.confirm(`Delete${task?.title ? ` “${task.title}”` : " this task"}?`)) deleteTask.mutate(id);
+              if (!task?._id) return;
+              deleteTask.reset();
+              setDeletingTask({ id: task._id, title: task.title });
             }}
           />
         )}
       </div>
       {taskPageQuery.isFetching && !taskPageQuery.isLoading ? <p className="mt-3 text-xs text-slate-500" role="status">Updating task results...</p> : null}
-      {updateTask.isError || deleteTask.isError ? (
-        <p className="mt-3 text-sm text-red-400" role="alert">
-          {updateTask.isError ? "Unable to update that task." : "Unable to delete that task."}
-        </p>
-      ) : null}
+      {updateTask.isError ? <p className="mt-3 text-sm text-red-400" role="alert">Unable to update that task.</p> : null}
       {taskPageQuery.data && (taskPageQuery.data.page > 1 || taskPageQuery.data.hasMore) ? (
         <nav className="mt-6 flex items-center justify-between" aria-label="Task pages">
           <button type="button" disabled={page <= 1 || taskPageQuery.isFetching} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
@@ -126,6 +126,22 @@ export default function TasksPage() {
         onSave={(data) => {
           if (!editingTask?._id) return;
           updateTask.mutate({ id: editingTask._id, ...data, baseUpdatedAt: editingTask.updatedAt }, { onSuccess: () => setEditingTask(null) });
+        }}
+      />
+      <TaskDeleteModal
+        open={Boolean(deletingTask)}
+        taskTitle={deletingTask?.title ?? "this task"}
+        deleting={deleteTask.isPending}
+        error={deleteTask.isError ? (deleteTask.error instanceof Error ? deleteTask.error.message : "Unable to delete that task.") : null}
+        onClose={() => {
+          if (!deleteTask.isPending) {
+            deleteTask.reset();
+            setDeletingTask(null);
+          }
+        }}
+        onConfirm={() => {
+          if (!deletingTask || deleteTask.isPending) return;
+          deleteTask.mutate(deletingTask.id, { onSuccess: () => setDeletingTask(null) });
         }}
       />
     </motion.div>
