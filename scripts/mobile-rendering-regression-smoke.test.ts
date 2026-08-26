@@ -17,6 +17,10 @@ async function main() {
   const input = await read("components/ui/Input.tsx");
   const signupForm = await read("components/auth/SignupForm.tsx");
   const serviceWorker = await read("public/push-sw.js");
+  const voicePage = await read("app/dashboard/voice/page.tsx");
+  const voiceRecorder = await read("hooks/useVoiceRecorder.ts");
+  const whisper = await read("lib/groq/whisper.ts");
+  const voiceSchema = await read("lib/validators/voice.ts");
 
   assert.match(login, /Suspense fallback=/);
   assert.match(signup, /Suspense fallback=/);
@@ -42,7 +46,20 @@ async function main() {
   assert.match(input, /onTouchEnd/);
   assert.match(signupForm, /onInput=/);
   assert.match(serviceWorker, /voicetasker-static-v4/);
-  console.log("PASS: mobile rendering, auth controls, service-worker refresh, PWA banner, and dashboard feedback/AI action contracts are covered");
+  assert.match(voicePage, /transcription-language/);
+  assert.match(voiceRecorder, /echoCancellation: true/);
+  assert.match(voiceRecorder, /noiseSuppression: true/);
+  assert.match(voiceRecorder, /autoGainControl: true/);
+  assert.match(voiceRecorder, /language, conversationId/);
+  assert.match(voiceRecorder, /ur-PK/);
+  assert.match(whisper, /VOICETASKER_TRANSCRIPTION_PROMPT/);
+  assert.match(whisper, /language === "auto"/);
+  assert.match(whisper, /temperature: 0/);
+  assert.match(voiceSchema, /language: z\.enum\(\["auto", "en", "ur"\]\)/);
+  const localWhisper = await read("lib/whisper-cpp/transcribe.ts");
+  assert.match(localWhisper, /"-l"/);
+  assert.match(localWhisper, /language/);
+  console.log("PASS: mobile rendering, auth controls, service-worker refresh, PWA banner, dashboard feedback/AI action, and transcription accuracy contracts are covered");
 }
 
 void main().catch((error) => {

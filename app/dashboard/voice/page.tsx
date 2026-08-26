@@ -16,14 +16,17 @@ import { VoiceCommandHistory } from "@/components/voice/VoiceCommandHistory";
 import { useVoiceHistory } from "@/hooks/useVoiceHistory";
 import { FeedbackButtons } from "@/components/ai/FeedbackButtons";
 
+type VoiceLanguage = "auto" | "en" | "ur";
+
 export default function VoicePage() {
   const dispatch = useDispatch();
   const { isRecording, isProcessing, transcript, interimTranscript, parsedIntent, queryResults, error, followUpPrompts, conversationId, calendarLink } = useSelector((s: RootState) => s.voice);
   const { data: history = [] } = useVoiceHistory();
-  const { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, retryUpload, startNewConversation, supported } = useVoiceRecorder();
   const [textInput, setTextInput] = useState("");
+  const [language, setLanguage] = useState<VoiceLanguage>("auto");
+  const { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, retryUpload, startNewConversation, supported } = useVoiceRecorder({ language });
   const [liveListening, setLiveListening] = useState(false);
-  const { start: startLiveRecognition, stop: stopLiveRecognition, supported: liveSupported } = useVoiceRecognition((text) => { if (text) void submitText(text); });
+  const { start: startLiveRecognition, stop: stopLiveRecognition, supported: liveSupported } = useVoiceRecognition((text) => { if (text) void submitText(text); }, language);
 
   function dismissPreview() { dispatch(setParsedIntent(null)); }
 
@@ -31,13 +34,21 @@ export default function VoicePage() {
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-2xl space-y-8">
       <div className="flex items-start justify-between gap-4 text-center">
         <div className="flex-1"><h2 className="text-2xl font-bold text-slate-100">Voice Interaction</h2><p className="mt-2 text-slate-400">Speak naturally to create, update, and query tasks.</p></div>
-        <Button type="button" size="sm" variant="ghost" onClick={startNewConversation}
->New conversation</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={startNewConversation}>New conversation</Button>
       </div>
 
       <div className="flex flex-col items-center gap-6 py-8">
         <VoiceWaveform active={isRecording || liveListening} bars={16} className="h-20" />
         <VoiceMicButton isRecording={isRecording} isProcessing={isProcessing} onClick={() => (isRecording ? stopRecording() : startRecording())} size="lg" />
+        <div className="w-full max-w-sm text-left">
+          <label htmlFor="transcription-language" className="mb-2 block text-sm text-slate-300">Transcription language</label>
+          <select id="transcription-language" value={language} onChange={(event) => setLanguage(event.target.value as VoiceLanguage)} disabled={isRecording || isProcessing || liveListening} className="min-h-11 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 text-sm text-slate-100 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30 disabled:cursor-not-allowed disabled:opacity-60">
+            <option value="auto">Automatic detection</option>
+            <option value="en">English</option>
+            <option value="ur">Urdu</option>
+          </select>
+          <p className="mt-2 text-xs text-slate-500">Automatic detection supports mixed English and Urdu commands. Choose a language when you are speaking only one language.</p>
+        </div>
         {liveSupported ? <Button type="button" variant={liveListening ? "primary" : "secondary"} onClick={() => { if (liveListening) { stopLiveRecognition(); setLiveListening(false); } else { startLiveRecognition(); setLiveListening(true); } }} disabled={isProcessing}>{liveListening ? "Stop live voice" : "Use live voice"}</Button> : null}
         {!supported ? <p className="text-sm text-amber-400" role="status">Microphone unavailable. Use text input below.</p> : null}
         {isProcessing ? <Button type="button" variant="ghost" onClick={cancelProcessing}>Cancel processing</Button> : null}

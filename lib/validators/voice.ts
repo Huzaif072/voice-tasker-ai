@@ -19,6 +19,7 @@ export const voiceInputSchema = z
     text: z.string().trim().min(1).max(10000).optional(),
     audio: z.string().max(12_000_000).optional(),
     mimeType: audioMimeType.optional(),
+    language: z.enum(["auto", "en", "ur"]).optional(),
     confirm: z.boolean().optional(),
     confirmationToken: z.string().max(512).optional(),
     conversationId: z.string().trim().regex(/^[a-zA-Z0-9_-]{8,100}$/, "Invalid conversation ID").optional(),

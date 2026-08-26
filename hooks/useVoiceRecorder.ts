@@ -26,6 +26,7 @@ function getMediaSupportSnapshot() { return Boolean(navigator.mediaDevices?.getU
 function getServerMediaSupportSnapshot() { return false; }
 const VOICE_UPLOAD_STATE_KEY = "voicetasker:voice-upload";
 
+type VoiceLanguage = "auto" | "en" | "ur";
 type VoiceUploadState = { uploadId: string; nextIndex: number; mimeType: string };
 function readVoiceUploadState(): VoiceUploadState | null {
   try {
@@ -48,7 +49,7 @@ interface VoiceResponse {
   tasks?: import("@/types/task").Task[];
 }
 
-export function useVoiceRecorder() {
+export function useVoiceRecorder({ language = "auto" }: { language?: VoiceLanguage } = {}) {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -138,7 +139,7 @@ export function useVoiceRecorder() {
         const res = await fetch("/api/voice/input", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uploadId, conversationId: conversationIdRef.current ?? undefined }),
+          body: JSON.stringify({ uploadId, language, conversationId: conversationIdRef.current ?? undefined }),
           signal: controller.signal,
         });
         const data = await res.json();
@@ -154,14 +155,14 @@ export function useVoiceRecorder() {
         dispatch(setProcessing(false));
       }
     },
-    [dispatch, handleVoiceResponse]
+    [dispatch, handleVoiceResponse, language]
   );
 
   const startRecording = useCallback(async () => {
     try {
       dispatch(resetVoice());
       dispatch(setVoiceError(null));
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48_000 } });
       const preferredMimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
       const mimeType = preferredMimeTypes.find((candidate) => MediaRecorder.isTypeSupported(candidate));
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 64_000 } : { audioBitsPerSecond: 64_000 });
@@ -263,7 +264,7 @@ export function useVoiceRecorder() {
   return { startRecording, stopRecording, submitText, confirmLastCommand, cancelProcessing, retryUpload, startNewConversation, supported };
 }
 
-export function useVoiceRecognition(onFinal?: (text: string) => void) {
+export function useVoiceRecognition(onFinal?: (text: string) => void, language: VoiceLanguage = "auto") {
   const dispatch = useDispatch();
   const recognitionRef = useRef<InstanceType<NonNullable<typeof window.SpeechRecognition>> | null>(null);
   const finalTranscriptRef = useRef("");
@@ -277,7 +278,7 @@ export function useVoiceRecognition(onFinal?: (text: string) => void) {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = "en-US";
+    recognition.lang = language === "ur" ? "ur-PK" : "en-US";
     recognition.onresult = (event) => {
       let interim = "";
       let final = "";
@@ -296,7 +297,7 @@ export function useVoiceRecognition(onFinal?: (text: string) => void) {
       finalTranscriptRef.current = "";
     });
     recognitionRef.current = recognition;
-  }, [dispatch]);
+  }, [dispatch, language]);
 
   const start = useCallback(() => {
     finalTranscriptRef.current = "";

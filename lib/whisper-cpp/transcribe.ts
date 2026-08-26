@@ -6,7 +6,7 @@ import { tmpdir } from "os";
 
 const execFileAsync = promisify(execFile);
 
-export async function transcribeLocal(audioBuffer: Buffer): Promise<string> {
+export async function transcribeLocal(audioBuffer: Buffer, language: "auto" | "en" | "ur" = "auto"): Promise<string> {
   const whisperPath = process.env.WHISPER_CPP_PATH;
   const modelPath = process.env.WHISPER_MODEL_PATH;
 
@@ -23,6 +23,8 @@ export async function transcribeLocal(audioBuffer: Buffer): Promise<string> {
       "-f",
       tmpFile,
       "--no-timestamps",
+      "-l",
+      language,
     ]);
     return stdout.trim();
   } finally {

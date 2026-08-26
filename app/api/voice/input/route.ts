@@ -115,24 +115,25 @@ export async function POST(request: Request) {
       const file = form.get("audio");
       if (!(file instanceof File)) return NextResponse.json({ error: "Audio file is required" }, { status: 400 });
       if (file.size > MAX_AUDIO_BYTES) return NextResponse.json({ error: "Audio recording is too large. Keep recordings under eight megabytes." }, { status: 413 });
-      body = { audio: Buffer.from(await file.arrayBuffer()).toString("base64"), mimeType: file.type || "audio/webm", conversationId: typeof form.get("conversationId") === "string" ? form.get("conversationId") : undefined };
+      body = { audio: Buffer.from(await file.arrayBuffer()).toString("base64"), mimeType: file.type || "audio/webm", language: typeof form.get("language") === "string" ? form.get("language") : undefined, conversationId: typeof form.get("conversationId") === "string" ? form.get("conversationId") : undefined };
     } else {
       body = await request.json();
     }
     const parsed = voiceInputSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid voice input" }, { status: 400 });
     let transcript = parsed.data.text ?? "";
+    const transcriptionLanguage = parsed.data.language ?? "auto";
     let assembledMimeType = parsed.data.mimeType ?? "audio/webm";
     if (!transcript && parsed.data.uploadId) {
       const upload = await assembleVoiceUpload(await connectWithRetry(), auth.user.id, parsed.data.uploadId);
       assembledMimeType = upload.mimeType;
-      try { transcript = await withTimeout(transcribeAudio(upload.audio, assembledMimeType), VOICE_PROVIDER_TIMEOUT_MS, "Remote transcription timed out"); }
-      catch { try { transcript = await withTimeout(transcribeLocal(upload.audio), VOICE_PROVIDER_TIMEOUT_MS, "Local transcription timed out"); } catch { return NextResponse.json({ error: "Transcription failed" }, { status: 502 }); } }
+      try { transcript = await withTimeout(transcribeAudio(upload.audio, assembledMimeType, transcriptionLanguage), VOICE_PROVIDER_TIMEOUT_MS, "Remote transcription timed out"); }
+      catch { try { transcript = await withTimeout(transcribeLocal(upload.audio, transcriptionLanguage), VOICE_PROVIDER_TIMEOUT_MS, "Local transcription timed out"); } catch { return NextResponse.json({ error: "Transcription failed" }, { status: 502 }); } }
     } else if (!transcript && parsed.data.audio) {
       const buffer = Buffer.from(parsed.data.audio, "base64");
       if (buffer.length > MAX_AUDIO_BYTES) return NextResponse.json({ error: "Audio recording is too large" }, { status: 413 });
-      try { transcript = await withTimeout(transcribeAudio(buffer, assembledMimeType), VOICE_PROVIDER_TIMEOUT_MS, "Remote transcription timed out"); }
-      catch { try { transcript = await withTimeout(transcribeLocal(buffer), VOICE_PROVIDER_TIMEOUT_MS, "Local transcription timed out"); } catch { return NextResponse.json({ error: "Transcription failed" }, { status: 502 }); } }
+      try { transcript = await withTimeout(transcribeAudio(buffer, assembledMimeType, transcriptionLanguage), VOICE_PROVIDER_TIMEOUT_MS, "Remote transcription timed out"); }
+      catch { try { transcript = await withTimeout(transcribeLocal(buffer, transcriptionLanguage), VOICE_PROVIDER_TIMEOUT_MS, "Local transcription timed out"); } catch { return NextResponse.json({ error: "Transcription failed" }, { status: 502 }); } }
     }
     if (!transcript.trim()) return NextResponse.json({ error: "No speech detected" }, { status: 400 });
 
