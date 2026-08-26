@@ -25,8 +25,10 @@ async function main() {
   assert.match(hero, /initial=\{false\}/);
   assert.match(features, /initial=\{false\}/);
   assert.match(cta, /initial=\{false\}/);
-  assert.match(pwaStatus, /md:left-64/);
+  assert.match(pwaStatus, /md:right-32/);
   assert.match(pwaStatus, /bottom-20/);
+  assert.match(pwaStatus, /Dismiss install message/);
+  assert.match(pwaStatus, /setInstallDismissed/);
   assert.match(input, /min-h-11 min-w-11/);
   assert.match(input, /touch-manipulation/);
   assert.match(signupForm, /onInput=/);

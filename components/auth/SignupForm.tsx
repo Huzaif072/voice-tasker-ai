@@ -115,10 +115,6 @@ export function SignupForm() {
             labelClassName="text-slate-300"
             required
           />
-          <label className="flex items-start gap-3 text-sm text-slate-300">
-            <input type="checkbox" checked={acceptLegal} onChange={(event) => setAcceptLegal(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-800 text-violet-500" />
-            <span>I accept the <Link href="/terms" className="text-violet-400 hover:text-violet-300">Terms of Service</Link> and <Link href="/privacy" className="text-violet-400 hover:text-violet-300">Privacy Policy</Link>.</span>
-          </label>
           <p id="signup-password-requirements" className="-mt-2 text-xs leading-5 text-slate-400">
             Use at least 8 characters, including one uppercase letter and one number.
           </p>
@@ -148,6 +144,10 @@ export function SignupForm() {
             labelClassName="text-slate-300"
             required
           />
+          <label className="flex items-start gap-3 text-sm text-slate-300">
+            <input type="checkbox" checked={acceptLegal} onChange={(event) => setAcceptLegal(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-800 text-violet-500" />
+            <span>I accept the <Link href="/terms" className="text-violet-400 hover:text-violet-300">Terms of Service</Link> and <Link href="/privacy" className="text-violet-400 hover:text-violet-300">Privacy Policy</Link>.</span>
+          </label>
           {error ? <p className="text-sm text-red-400" role="alert" aria-live="polite">{error}</p> : null}
           <p className="sr-only" aria-live="polite">{loading ? "Creating your account…" : ""}</p>
           <Button type="submit" loading={loading} className="w-full">
